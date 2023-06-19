@@ -42,16 +42,53 @@ impl CoseSign {
         }
     }
 
-    pub fn add_header(&mut self, header: headers::CoseHeader) {
+    #[wasm_bindgen(getter)]
+    pub fn header(&self) -> headers::CoseHeader {
+        self.header.clone()
+    }
+
+    #[wasm_bindgen(getter)]
+    pub fn bytes(&self) -> Vec<u8> {
+        self.bytes.clone()
+    }
+    #[wasm_bindgen(getter)]
+    pub fn payload(&self) -> Vec<u8> {
+        self.payload.clone()
+    }
+
+    #[wasm_bindgen(getter)]
+    pub fn counters_len(&self) -> usize {
+        self.header.counters.len()
+    }
+    pub fn counter_header(&self, i: usize) -> headers::CoseHeader {
+        self.header.counters[i].header.clone()
+    }
+    pub fn counter(&mut self, kid: Vec<u8>) -> Result<Vec<usize>, JsValue> {
+        let mut counters: Vec<usize> = Vec::new();
+        for i in 0..self.header.counters.len() {
+            if self.header.counters[i]
+                .header
+                .kid
+                .as_ref()
+                .ok_or(JsValue::from("Missing KID"))?
+                == &kid
+            {
+                counters.push(i);
+            }
+        }
+        Ok(counters)
+    }
+
+    pub fn signer_header(&self, i: usize) -> headers::CoseHeader {
+        self.signers[i].header.clone()
+    }
+
+    pub fn set_header(&mut self, header: headers::CoseHeader) {
         self.header = header;
     }
 
-    pub fn payload(&mut self, payload: Vec<u8>) {
+    pub fn set_payload(&mut self, payload: Vec<u8>) {
         self.payload = payload;
-    }
-
-    pub fn get_bytes(&self) -> Vec<u8> {
-        self.bytes.clone()
     }
 
     pub fn set_bytes(&mut self, bytes: Vec<u8>) {
@@ -129,6 +166,10 @@ impl CoseSign {
         if !self.sign && !self.verify {
             return Err(JsValue::from("Key unable to sign or verify"));
         }
+        Ok(())
+    }
+    pub fn add_counter_key(&mut self, i: usize, key: &keys::CoseKey) -> Result<(), JsValue> {
+        self.header.counters[i].key(key)?;
         Ok(())
     }
 

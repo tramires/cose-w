@@ -60,11 +60,26 @@ impl CoseAgent {
             context: sig_struct::COUNTER_SIGNATURE.to_string(),
         }
     }
-
-    pub fn add_header(&mut self, header: headers::CoseHeader) {
+    #[wasm_bindgen(getter)]
+    pub fn header(&self) -> headers::CoseHeader {
+        self.header.clone()
+    }
+    #[wasm_bindgen(getter)]
+    pub fn payload(&self) -> Vec<u8> {
+        self.payload.clone()
+    }
+    pub fn set_header(&mut self, header: headers::CoseHeader) {
         self.header = header;
     }
-
+    pub fn ephemeral_key(&mut self, key: keys::CoseKey, prot: bool, crit: bool) {
+        self.header.ephemeral_key(key, prot, crit);
+    }
+    pub fn static_key(&mut self, key: keys::CoseKey, prot: bool, crit: bool) {
+        self.header.static_key(key, prot, crit);
+    }
+    pub fn set_static_kid(&mut self, kid: Vec<u8>, key: keys::CoseKey, prot: bool, crit: bool) {
+        self.header.set_static_kid(kid, key, prot, crit);
+    }
     pub fn key(&mut self, key: &keys::CoseKey) -> Result<(), JsValue> {
         let alg = self.header.alg.ok_or(JsValue::from("Missing Header alg"))?;
         key.verify_kty()?;

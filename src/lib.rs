@@ -97,7 +97,7 @@ mod test_vecs {
         let mut key = keys::CoseKey::new();
         key.bytes = ELEVEN.to_vec();
         key.decode().unwrap();
-        key.alg(algs::ES256);
+        key.set_alg(algs::ES256);
         verify.signers[v1].key(&key).unwrap();
         verify.decode(None, Some(v1)).unwrap();
     }
@@ -125,12 +125,12 @@ mod test_vecs {
         let mut key = keys::CoseKey::new();
         key.bytes = ELEVEN.to_vec();
         key.decode().unwrap();
-        key.alg(algs::ES256);
+        key.set_alg(algs::ES256);
         verify.signers[v1].key(&key).unwrap();
 
         verify.decode(None, Some(v1)).unwrap();
 
-        let counter = verify.header.get_counter(b"11".to_vec()).unwrap()[0];
+        let counter = verify.counter(b"11".to_vec()).unwrap()[0];
         verify.header.counters[counter].key(&key).unwrap();
         verify.counters_verify(None, counter).unwrap();
     }
@@ -150,7 +150,7 @@ mod test_vecs {
         let mut key = keys::CoseKey::new();
         key.bytes = ELEVEN.to_vec();
         key.decode().unwrap();
-        key.alg(algs::ES256);
+        key.set_alg(algs::ES256);
         verify.key(&key).unwrap();
         verify.decode(None, None).unwrap();
     }
@@ -170,12 +170,12 @@ mod test_vecs {
             107, 108, 97, 110, 100, 46, 101, 120, 97, 109, 112, 108, 101, 64,
         ]
         .to_vec();
-        dec.init_decoder().unwrap();
+        dec.init_decoder(None).unwrap();
         let r = dec.get_recipient(kid).unwrap()[0];
         let mut key = keys::CoseKey::new();
         key.bytes = MERIADOC.to_vec();
         key.decode().unwrap();
-        key.alg(algs::ES256);
+        key.set_alg(algs::ES256);
         dec.recipients[r].key(&key).unwrap();
         assert_eq!(dec.decode(None, Some(r)).unwrap(), msg);
     }
@@ -198,20 +198,20 @@ mod test_vecs {
             28, 98,
         ]
         .to_vec();
-        dec.init_decoder().unwrap();
+        dec.init_decoder(None).unwrap();
         let r = dec.get_recipient(kid).unwrap()[0];
         let mut key = keys::CoseKey::new();
         key.bytes = MERIADOC.to_vec();
         key.decode().unwrap();
-        key.alg(algs::ES256);
-        key.key_ops(vec![keys::KEY_OPS_DERIVE]);
+        key.set_alg(algs::ES256);
+        key.set_key_ops(vec![keys::KEY_OPS_DERIVE]);
         dec.recipients[r].key(&key).unwrap();
         key = keys::CoseKey::new();
         key.bytes = PEREGRIN.to_vec();
         key.decode().unwrap();
-        key.alg(algs::ES256);
-        key.key_ops(vec![keys::KEY_OPS_DERIVE]);
-        dec.recipients[r].header.ecdh_key(key);
+        key.set_alg(algs::ES256);
+        key.set_key_ops(vec![keys::KEY_OPS_DERIVE]);
+        dec.recipients[r].header.set_ecdh_key(key);
         assert_eq!(dec.decode(Some(aad), Some(r)).unwrap(), msg);
     }
     #[wasm_bindgen_test]
@@ -223,12 +223,12 @@ mod test_vecs {
             129, 131, 64, 162, 1, 37, 4, 74, 111, 117, 114, 45, 115, 101, 99, 114, 101, 116, 64,
         ]
         .to_vec();
-        verify.init_decoder().unwrap();
+        verify.init_decoder(None).unwrap();
         let r = verify.get_recipient(b"our-secret".to_vec()).unwrap()[0];
         let mut key = keys::CoseKey::new();
         key.bytes = OUR_SECRET.to_vec();
         key.decode().unwrap();
-        key.alg(algs::AES_MAC_256_64);
+        key.set_alg(algs::AES_MAC_256_64);
         verify.recipients[r].key(&key).unwrap();
         verify.decode(None, Some(r)).unwrap();
     }
@@ -251,18 +251,18 @@ mod test_vecs {
             231, 242, 169, 229, 206, 77, 181, 64,
         ]
         .to_vec();
-        verify.init_decoder().unwrap();
+        verify.init_decoder(None).unwrap();
         let r = verify.get_recipient(kid).unwrap()[0];
         let mut key = keys::CoseKey::new();
         key.bytes = MERIADOC.to_vec();
         key.decode().unwrap();
-        key.alg(algs::ES256);
+        key.set_alg(algs::ES256);
         verify.recipients[r].key(&key).unwrap();
         key = keys::CoseKey::new();
         key.bytes = PEREGRIN.to_vec();
         key.decode().unwrap();
-        key.alg(algs::ES256);
-        verify.recipients[r].header.ecdh_key(key);
+        key.set_alg(algs::ES256);
+        verify.recipients[r].header.set_ecdh_key(key);
 
         verify.decode(None, Some(r)).unwrap();
     }
@@ -279,12 +279,12 @@ mod test_vecs {
             129, 200, 9, 62, 186, 144, 111, 34, 123, 110, 176,
         ]
         .to_vec();
-        verify.init_decoder().unwrap();
+        verify.init_decoder(None).unwrap();
         let r = verify.get_recipient(kid).unwrap()[0];
         let mut key = keys::CoseKey::new();
         key.bytes = UID.to_vec();
         key.decode().unwrap();
-        key.alg(algs::AES_MAC_128_64);
+        key.set_alg(algs::AES_MAC_128_64);
         verify.recipients[r].key(&key).unwrap();
 
         verify.decode(None, Some(r)).unwrap();
@@ -297,11 +297,11 @@ mod test_vecs {
             32, 99, 111, 110, 116, 101, 110, 116, 46, 72, 114, 96, 67, 116, 80, 39, 33, 79,
         ]
         .to_vec();
-        verify.init_decoder().unwrap();
+        verify.init_decoder(None).unwrap();
         let mut key = keys::CoseKey::new();
         key.bytes = OUR_SECRET.to_vec();
         key.decode().unwrap();
-        key.alg(algs::AES_MAC_256_64);
+        key.set_alg(algs::AES_MAC_256_64);
         verify.key(&key).unwrap();
         verify.decode(None, None).unwrap();
     }

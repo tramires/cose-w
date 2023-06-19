@@ -42,19 +42,56 @@ impl CoseEncrypt {
         }
     }
 
-    pub fn add_header(&mut self, header: headers::CoseHeader) {
-        self.header = header;
+    #[wasm_bindgen(getter)]
+    pub fn header(&self) -> headers::CoseHeader {
+        self.header.clone()
     }
 
-    pub fn get_bytes(&self) -> Vec<u8> {
+    #[wasm_bindgen(getter)]
+    pub fn bytes(&self) -> Vec<u8> {
         self.bytes.clone()
+    }
+
+    #[wasm_bindgen(getter)]
+    pub fn recipients_len(&self) -> usize {
+        self.recipients.len()
+    }
+
+    #[wasm_bindgen(getter)]
+    pub fn counters_len(&self) -> usize {
+        self.header.counters.len()
+    }
+    pub fn counter_header(&self, i: usize) -> headers::CoseHeader {
+        self.header.counters[i].header.clone()
+    }
+    pub fn counter(&mut self, kid: Vec<u8>) -> Result<Vec<usize>, JsValue> {
+        let mut counters: Vec<usize> = Vec::new();
+        for i in 0..self.header.counters.len() {
+            if self.header.counters[i]
+                .header
+                .kid
+                .as_ref()
+                .ok_or(JsValue::from("Missing KID"))?
+                == &kid
+            {
+                counters.push(i);
+            }
+        }
+        Ok(counters)
+    }
+    pub fn recipient_header(&self, i: usize) -> headers::CoseHeader {
+        self.recipients[i].header.clone()
+    }
+
+    pub fn set_header(&mut self, header: headers::CoseHeader) {
+        self.header = header;
     }
 
     pub fn set_bytes(&mut self, bytes: Vec<u8>) {
         self.bytes = bytes;
     }
 
-    pub fn payload(&mut self, payload: Vec<u8>) {
+    pub fn set_payload(&mut self, payload: Vec<u8>) {
         self.payload = payload;
     }
 
@@ -69,6 +106,13 @@ impl CoseEncrypt {
         Ok(())
     }
 
+    pub fn add_recipient_key(
+        &mut self,
+        recipient: usize,
+        key: &keys::CoseKey,
+    ) -> Result<(), JsValue> {
+        self.recipients[recipient].key(key)
+    }
     pub fn get_recipient(&self, kid: Vec<u8>) -> Result<Vec<usize>, JsValue> {
         let mut keys: Vec<usize> = Vec::new();
         for i in 0..self.recipients.len() {
@@ -349,7 +393,7 @@ impl CoseEncrypt {
         }
     }
 
-    pub fn init_decoder(&mut self) -> Result<(), JsValue> {
+    pub fn init_decoder(&mut self, ciphertext: Option<Vec<u8>>) -> Result<(), JsValue> {
         let input = self.bytes.clone();
         let mut d = Decoder::new(input);
         let mut tag: Option<u32> = None;
@@ -407,9 +451,14 @@ impl CoseEncrypt {
         {
             return Err(JsValue::from("Invalid COSE Structure"));
         }
-        self.ciphertext = d.bytes()?.to_vec();
-        if self.ciphertext.len() <= 0 {
-            return Err(JsValue::from("Missing ciphertext"));
+        if ciphertext == None {
+            self.ciphertext = d.bytes()?.to_vec();
+            if self.ciphertext.len() <= 0 {
+                return Err(JsValue::from("Missing ciphertext"));
+            }
+        } else {
+            self.ciphertext = ciphertext.unwrap();
+            d.skip();
         }
 
         let mut r_len = 0;

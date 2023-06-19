@@ -93,7 +93,7 @@ impl Encoder {
             if val <= CBOR_MAX as i32 {
                 self.encoded.push(val as u8 + MAJOR_NEG - 1);
             } else {
-                self.encode_major(val as usize, MAJOR_NEG_U8);
+                self.encode_major(val as usize - 1, MAJOR_NEG_U8);
             }
         }
     }

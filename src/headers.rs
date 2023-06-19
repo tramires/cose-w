@@ -24,7 +24,7 @@ pub(crate) const EPHEMERAL_KEY: i32 = -1;
 pub(crate) const STATIC_KEY: i32 = -2;
 pub(crate) const STATIC_KEY_ID: i32 = -3;
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq)]
 pub(crate) enum ContentTypeTypes {
     Uint(u32),
     Tstr(String),
@@ -81,6 +81,81 @@ impl CoseHeader {
         }
     }
 
+    #[wasm_bindgen(getter)]
+    pub fn protected(&self) -> Vec<i32> {
+        self.protected.clone()
+    }
+    #[wasm_bindgen(getter)]
+    pub fn unprotected(&self) -> Vec<i32> {
+        self.unprotected.clone()
+    }
+    #[wasm_bindgen(getter)]
+    pub fn alg(&self) -> Option<i32> {
+        self.alg.clone()
+    }
+    #[wasm_bindgen(getter)]
+    pub fn crit(&self) -> Vec<i32> {
+        self.crit.clone()
+    }
+    #[wasm_bindgen(getter)]
+    pub fn content_type(&self) -> Option<String> {
+        if self.content_type == None {
+            return None;
+        }
+        match self.content_type.as_ref().unwrap() {
+            ContentTypeTypes::Uint(v) => Some(v.to_string()),
+            ContentTypeTypes::Tstr(v) => Some(v.to_string()),
+        }
+    }
+    #[wasm_bindgen(getter)]
+    pub fn kid(&self) -> Option<Vec<u8>> {
+        self.kid.clone()
+    }
+    #[wasm_bindgen(getter)]
+    pub fn iv(&self) -> Option<Vec<u8>> {
+        self.iv.clone()
+    }
+    #[wasm_bindgen(getter)]
+    pub fn partial_iv(&self) -> Option<Vec<u8>> {
+        self.partial_iv.clone()
+    }
+    #[wasm_bindgen(getter)]
+    pub fn salt(&self) -> Option<Vec<u8>> {
+        self.salt.clone()
+    }
+    #[wasm_bindgen(getter)]
+    pub fn party_u_identity(&self) -> Option<Vec<u8>> {
+        self.party_u_identity.clone()
+    }
+    #[wasm_bindgen(getter)]
+    pub fn party_u_nonce(&self) -> Option<Vec<u8>> {
+        self.party_u_nonce.clone()
+    }
+    #[wasm_bindgen(getter)]
+    pub fn party_u_other(&self) -> Option<Vec<u8>> {
+        self.party_u_other.clone()
+    }
+    #[wasm_bindgen(getter)]
+    pub fn party_v_identity(&self) -> Option<Vec<u8>> {
+        self.party_v_identity.clone()
+    }
+    #[wasm_bindgen(getter)]
+    pub fn party_v_nonce(&self) -> Option<Vec<u8>> {
+        self.party_v_nonce.clone()
+    }
+    #[wasm_bindgen(getter)]
+    pub fn party_v_other(&self) -> Option<Vec<u8>> {
+        self.party_v_other.clone()
+    }
+    #[wasm_bindgen(getter)]
+    pub fn ecdh_key(&self) -> keys::CoseKey {
+        self.ecdh_key.clone()
+    }
+    #[wasm_bindgen(getter)]
+    pub fn static_kid(&self) -> Option<Vec<u8>> {
+        self.static_kid.clone()
+    }
+
     pub(crate) fn remove_label(&mut self, label: i32) {
         self.unprotected.retain(|&x| x != label);
         self.protected.retain(|&x| x != label);
@@ -98,41 +173,41 @@ impl CoseHeader {
         }
     }
 
-    pub fn alg(&mut self, alg: i32, prot: bool, crit: bool) {
+    pub fn set_alg(&mut self, alg: i32, prot: bool, crit: bool) {
         self.reg_label(ALG, prot, crit);
         self.alg = Some(alg);
     }
 
-    pub fn kid(&mut self, kid: Vec<u8>, prot: bool, crit: bool) {
+    pub fn set_kid(&mut self, kid: Vec<u8>, prot: bool, crit: bool) {
         self.reg_label(KID, prot, crit);
         self.kid = Some(kid);
     }
 
-    pub fn iv(&mut self, iv: Vec<u8>, prot: bool, crit: bool) {
+    pub fn set_iv(&mut self, iv: Vec<u8>, prot: bool, crit: bool) {
         self.remove_label(PARTIAL_IV);
         self.partial_iv = None;
         self.reg_label(IV, prot, crit);
         self.iv = Some(iv);
     }
 
-    pub fn partial_iv(&mut self, partial_iv: Vec<u8>, prot: bool, crit: bool) {
+    pub fn set_partial_iv(&mut self, partial_iv: Vec<u8>, prot: bool, crit: bool) {
         self.remove_label(IV);
         self.iv = None;
         self.reg_label(PARTIAL_IV, prot, crit);
         self.partial_iv = Some(partial_iv);
     }
 
-    pub fn salt(&mut self, salt: Vec<u8>, prot: bool, crit: bool) {
+    pub fn set_salt(&mut self, salt: Vec<u8>, prot: bool, crit: bool) {
         self.reg_label(SALT, prot, crit);
         self.salt = Some(salt);
     }
 
-    pub fn content_type(&mut self, content_type: u32, prot: bool, crit: bool) {
+    pub fn set_content_type(&mut self, content_type: u32, prot: bool, crit: bool) {
         self.reg_label(CONTENT_TYPE, prot, crit);
         self.content_type = Some(ContentTypeTypes::Uint(content_type));
     }
 
-    pub fn party_identity(&mut self, identity: Vec<u8>, prot: bool, crit: bool, u: bool) {
+    pub fn set_party_identity(&mut self, identity: Vec<u8>, prot: bool, crit: bool, u: bool) {
         if u {
             self.reg_label(PARTY_U_IDENTITY, prot, crit);
             self.party_u_identity = Some(identity);
@@ -142,7 +217,7 @@ impl CoseHeader {
         }
     }
 
-    pub fn party_nonce(&mut self, nonce: Vec<u8>, prot: bool, crit: bool, u: bool) {
+    pub fn set_party_nonce(&mut self, nonce: Vec<u8>, prot: bool, crit: bool, u: bool) {
         if u {
             self.reg_label(PARTY_U_NONCE, prot, crit);
             self.party_u_nonce = Some(nonce);
@@ -152,7 +227,7 @@ impl CoseHeader {
         }
     }
 
-    pub fn party_other(&mut self, other: Vec<u8>, prot: bool, crit: bool, u: bool) {
+    pub fn set_party_other(&mut self, other: Vec<u8>, prot: bool, crit: bool, u: bool) {
         if u {
             self.reg_label(PARTY_U_OTHER, prot, crit);
             self.party_u_other = Some(other);
@@ -178,7 +253,7 @@ impl CoseHeader {
         self.ecdh_key = key;
     }
 
-    pub fn static_key_id(&mut self, kid: Vec<u8>, key: keys::CoseKey, prot: bool, crit: bool) {
+    pub fn set_static_kid(&mut self, kid: Vec<u8>, key: keys::CoseKey, prot: bool, crit: bool) {
         self.remove_label(STATIC_KEY);
         self.remove_label(EPHEMERAL_KEY);
         self.reg_label(STATIC_KEY_ID, prot, crit);
@@ -186,7 +261,7 @@ impl CoseHeader {
         self.static_kid = Some(kid);
     }
 
-    pub fn ecdh_key(&mut self, key: keys::CoseKey) {
+    pub fn set_ecdh_key(&mut self, key: keys::CoseKey) {
         self.ecdh_key = key;
     }
 
@@ -455,12 +530,8 @@ impl CoseHeader {
             self.partial_iv = Some(decoder.bytes()?);
         } else if label == EPHEMERAL_KEY {
             self.ecdh_key.decode_key(decoder)?;
-            self.ecdh_key
-                .alg(self.alg.ok_or(JsValue::from("Missing alg"))?);
         } else if label == STATIC_KEY {
             self.ecdh_key.decode_key(decoder)?;
-            self.ecdh_key
-                .alg(self.alg.ok_or(JsValue::from("Missing alg"))?);
         } else if label == STATIC_KEY_ID {
             self.static_kid = Some(decoder.bytes()?);
         } else if label == COUNTER_SIG && !is_counter_sig {
@@ -501,21 +572,5 @@ impl CoseHeader {
             ));
         }
         Ok(())
-    }
-
-    pub fn get_counter(&mut self, kid: Vec<u8>) -> Result<Vec<usize>, JsValue> {
-        let mut counters: Vec<usize> = Vec::new();
-        for i in 0..self.counters.len() {
-            if self.counters[i]
-                .header
-                .kid
-                .as_ref()
-                .ok_or(JsValue::from("Missing KID"))?
-                == &kid
-            {
-                counters.push(i);
-            }
-        }
-        Ok(counters)
     }
 }

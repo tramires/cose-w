@@ -109,6 +109,56 @@ impl CoseKey {
         }
     }
 
+    #[wasm_bindgen(getter)]
+    pub fn bytes(&self) -> Vec<u8> {
+        self.bytes.clone()
+    }
+
+    #[wasm_bindgen(getter)]
+    pub fn kty(&self) -> Option<i32> {
+        self.kty.clone()
+    }
+    #[wasm_bindgen(getter)]
+    pub fn base_iv(&self) -> Option<Vec<u8>> {
+        self.base_iv.clone()
+    }
+    #[wasm_bindgen(getter)]
+    pub fn key_ops(&self) -> Vec<i32> {
+        self.key_ops.clone()
+    }
+    #[wasm_bindgen(getter)]
+    pub fn alg(&self) -> Option<i32> {
+        self.alg.clone()
+    }
+    #[wasm_bindgen(getter)]
+    pub fn x(&self) -> Option<Vec<u8>> {
+        self.x.clone()
+    }
+    #[wasm_bindgen(getter)]
+    pub fn y(&self) -> Option<Vec<u8>> {
+        self.y.clone()
+    }
+    #[wasm_bindgen(getter)]
+    pub fn d(&self) -> Option<Vec<u8>> {
+        self.d.clone()
+    }
+    #[wasm_bindgen(getter)]
+    pub fn k(&self) -> Option<Vec<u8>> {
+        self.k.clone()
+    }
+    #[wasm_bindgen(getter)]
+    pub fn kid(&self) -> Option<Vec<u8>> {
+        self.kid.clone()
+    }
+    #[wasm_bindgen(getter)]
+    pub fn crv(&self) -> Option<i32> {
+        self.crv.clone()
+    }
+
+    pub fn set_bytes(&mut self, bytes: Vec<u8>) {
+        self.bytes = bytes;
+    }
+
     fn reg_label(&mut self, label: i32) {
         self.used.retain(|&x| x != label);
         self.used.push(label);
@@ -118,52 +168,52 @@ impl CoseKey {
         self.used.retain(|&x| x != label);
     }
 
-    pub fn kty(&mut self, kty: i32) {
+    pub fn set_kty(&mut self, kty: i32) {
         self.reg_label(KTY);
         self.kty = Some(kty);
     }
 
-    pub fn kid(&mut self, kid: Vec<u8>) {
+    pub fn set_kid(&mut self, kid: Vec<u8>) {
         self.reg_label(KID);
         self.kid = Some(kid);
     }
 
-    pub fn alg(&mut self, alg: i32) {
+    pub fn set_alg(&mut self, alg: i32) {
         self.reg_label(ALG);
         self.alg = Some(alg);
     }
 
-    pub fn key_ops(&mut self, key_ops: Vec<i32>) {
+    pub fn set_key_ops(&mut self, key_ops: Vec<i32>) {
         self.reg_label(KEY_OPS);
         self.key_ops = key_ops;
     }
 
-    pub fn base_iv(&mut self, base_iv: Vec<u8>) {
+    pub fn set_base_iv(&mut self, base_iv: Vec<u8>) {
         self.reg_label(BASE_IV);
         self.base_iv = Some(base_iv);
     }
 
-    pub fn crv(&mut self, crv: i32) {
+    pub fn set_crv(&mut self, crv: i32) {
         self.reg_label(CRV_K);
         self.crv = Some(crv);
     }
 
-    pub fn x(&mut self, x: Vec<u8>) {
+    pub fn set_x(&mut self, x: Vec<u8>) {
         self.reg_label(X);
         self.x = Some(x);
     }
 
-    pub fn y(&mut self, y: Vec<u8>) {
+    pub fn set_y(&mut self, y: Vec<u8>) {
         self.reg_label(Y);
         self.y = Some(y);
     }
 
-    pub fn d(&mut self, d: Vec<u8>) {
+    pub fn set_d(&mut self, d: Vec<u8>) {
         self.reg_label(D);
         self.d = Some(d);
     }
 
-    pub fn k(&mut self, k: Vec<u8>) {
+    pub fn set_k(&mut self, k: Vec<u8>) {
         self.reg_label(CRV_K);
         self.k = Some(k);
     }

@@ -1,6 +1,13 @@
 [package]
 name = "cose-w"
-version = "0.1.0"
+version = "0.1.2"
+authors = ["Tiago Ramires"]
+license = "MIT"
+description = "COSE WebAssembly"
+repository = "https://github.com/tramires/cose-w"
+readme = "README.md"
+keywords = ["cose", "mac", "encryption", "signature", "cbor", "wasm"]
+categories = ["cryptography", "encoding"]
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
