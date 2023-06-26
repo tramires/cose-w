@@ -56,7 +56,7 @@ key.set_key_ops([KeyOp.verify]);
 
 // Prepare CoseSign with the cose-sign1 bytes
 let verify = CoseMessage.new_sign();
-verify.set_bytes(Buffer.from("d28447a2012604423131a054546869732069732074686520636f6e74656e742e58405e84ce5812b0966e6919ff1ac15c030666bae902c0705d1e0a5fbac8
+verify.set_bytes(Buffer.from("d28447a2012604423131a054546869732069732074686520636f6e74656e742e58405e84ce5812b0966e6919ff1ac15c030666bae902c0705d1e0a5fbac828437c63b0bb87a95a456835f4d115850adefcf0fd0a5c26027140c10d3e20a890c5eaa7", "hex"));
 
 // Init decoding and add key
 verify.init_decoder(null);
@@ -110,7 +110,7 @@ key.set_key_ops([KeyOp.decrypt]);
 
 // Prepare CoseEncrypt with the cose-encrypt0 bytes
 let dec = CoseMessage.new_encrypt();
-dec.set_bytes(Buffer.from("d08352a2011818054c89f52f65a1c580933b5261a7a0582481c32c048134989007b3b5b932811ea410eeab15bd0de5d5ac5be03c84dce8c88871d6e9", "hex
+dec.set_bytes(Buffer.from("d08352a2011818054c89f52f65a1c580933b5261a7a0582481c32c048134989007b3b5b932811ea410eeab15bd0de5d5ac5be03c84dce8c88871d6e9", "hex"));
 
 // Init decoding and add key
 dec.init_decoder(null);
