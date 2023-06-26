@@ -50,7 +50,7 @@ key2.set_key_ops([KeyOp.sign]);
 
 
 // Prepare CoseSign
-let sign = new CoseSign();
+let sign = CoseMessage.new_sign();
 sign.set_payload(msg);
 let header = new CoseHeader();
 header.set_alg(Alg.es256, true, false);
@@ -59,7 +59,7 @@ sign.set_header(header);
 sign.key(key1);
 
 // Generate signature
-sign.gen_signature(null);
+sign.secure_content(null);
 
 // Prepare counter signer
 let counter1 = CoseAgent.new_counter_sig();
@@ -74,7 +74,7 @@ sign.counter_sig(null, counter1);
 sign.add_counter_sig(counter1);
 
 // Encode the cose-sign1 message
-sign.encode(true);
+let bytes = sign.encode(true);
 ```
 
 ### Decode
@@ -98,7 +98,7 @@ key2.set_y(Buffer.from('20138bf82dc1b6d562be0fa54ab7804a3a64b6d72ccfed6b6fb6ed28
 key2.set_key_ops([KeyOp.verify]);
 
 // Prepare CoseSign with the cose-sign1 bytes
-let verify = new CoseSign();
+let verify = CoseMessage.new_sign();
 verify.set_bytes(Buffer.from("d28446a20126044101a1078346a20441000126a0584019b7fc0f2b13cd8d1891beb3d5fcadb79dfd14384f48059454cbab16e01503a261e8f5dc47aa998782b7baa74b260ec5dd3694e44f88c99c5db7f61ff8aca23954546869732069732074686520636f6e74656e742e5840cf6f9dd76e5c7252e72bf6bf685fced5d82309c4ae0df229a501529636106ae99ddb5efc8b73c208ddbc815f91d71dc9b7db8ce6390f76ad01ba256fc0eae575", "hex"));
 
 // Init decoding
@@ -106,7 +106,7 @@ verify.init_decoder(null);
 
 // Add key and verify signature
 verify.key(key1);
-verify.decode(null, null);
+let payload = verify.decode(null, null);
 
 // Get counter signer and verify counter signature
 let i = verify.counter([0]);
