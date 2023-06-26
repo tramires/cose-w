@@ -1,17 +1,37 @@
 use crate::keys;
+
 use aes::{Aes128, Aes192, Aes256};
 use aes_kw::{Kek, KekAes128, KekAes192, KekAes256};
+use cbc_mac::{CbcMac, Mac};
 use getrandom::getrandom;
 use hkdf::Hkdf;
+use hmac::Hmac;
 use sha2::{Sha256, Sha384, Sha512};
 use wasm_bindgen::prelude::*;
 
+type Daa128 = CbcMac<Aes128>;
+type Daa256 = CbcMac<Aes256>;
+
+type HmacSha256 = Hmac<Sha256>;
+type HmacSha384 = Hmac<Sha384>;
+type HmacSha512 = Hmac<Sha512>;
+
 pub(crate) const ES256: i32 = -7;
+pub(crate) const ES256K: i32 = -47;
 pub(crate) const ES384: i32 = -35;
 pub(crate) const ES512: i32 = -36;
 pub(crate) const EDDSA: i32 = -8;
-pub(crate) const SIGNING_ALGS: [i32; 4] = [ES256, ES384, ES512, EDDSA];
-pub(crate) const SIGNING_ALGS_NAMES: [&str; 4] = ["ES256", "ES384", "ES512", "EDDSA"];
+pub(crate) const PS512: i32 = -39;
+pub(crate) const PS384: i32 = -38;
+pub(crate) const PS256: i32 = -37;
+pub(crate) const SIGNING_ALGS: [i32; 8] = [ES256, ES384, ES512, EDDSA, PS256, PS384, PS512, ES256K];
+pub(crate) const SIGNING_ALGS_NAMES: [&str; 8] = [
+    "ES256", "ES384", "ES512", "EDDSA", "PS256", "PS384", "PS512", "ES256K",
+];
+
+pub(crate) const SHA_256: i32 = -16;
+pub(crate) const HASH_ALGS: [i32; 1] = [SHA_256];
+pub(crate) const HASH_ALGS_NAMES: [&str; 1] = ["SHA-256"];
 
 pub(crate) const A128GCM: i32 = 1;
 pub(crate) const A192GCM: i32 = 2;
@@ -154,22 +174,6 @@ pub(crate) const ECDH_ALGS: [i32; 10] = [
     ECDH_SS_A256KW,
 ];
 
-const K32_ALGS: [i32; 12] = [
-    A256GCM,
-    AES_CCM_16_64_256,
-    AES_CCM_64_64_256,
-    AES_CCM_16_128_256,
-    AES_CCM_64_128_256,
-    AES_MAC_256_128,
-    AES_MAC_256_64,
-    HMAC_256_256,
-    HMAC_256_64,
-    ECDH_ES_A256KW,
-    ECDH_SS_A256KW,
-    A256KW,
-];
-const K24_ALGS: [i32; 4] = [ECDH_ES_A192KW, ECDH_SS_A192KW, A192GCM, A128KW];
-
 const K16_ALGS: [i32; 11] = [
     A128GCM,
     CHACHA20,
@@ -181,8 +185,28 @@ const K16_ALGS: [i32; 11] = [
     AES_MAC_128_128,
     ECDH_ES_A128KW,
     ECDH_SS_A128KW,
-    A192KW,
+    A128KW,
 ];
+const K24_ALGS: [i32; 4] = [A192KW, ECDH_ES_A192KW, ECDH_SS_A192KW, A192GCM];
+const K32_ALGS: [i32; 12] = [
+    A256GCM,
+    AES_CCM_16_64_256,
+    AES_CCM_64_64_256,
+    AES_CCM_16_128_256,
+    AES_CCM_64_128_256,
+    AES_MAC_256_128,
+    AES_MAC_256_64,
+    HMAC_256_64,
+    HMAC_256_256,
+    ECDH_ES_A256KW,
+    ECDH_SS_A256KW,
+    A256KW,
+];
+
+const DER_S2: [u8; 16] = [48, 46, 2, 1, 0, 48, 5, 6, 3, 43, 101, 112, 4, 34, 4, 32];
+const DER_S4: [u8; 16] = [48, 71, 2, 1, 0, 48, 5, 6, 3, 43, 101, 113, 4, 59, 4, 57];
+const DER_P2: [u8; 12] = [48, 42, 48, 5, 6, 3, 43, 101, 112, 3, 33, 0];
+const DER_P4: [u8; 12] = [48, 67, 48, 5, 6, 3, 43, 101, 113, 3, 58, 0];
 
 pub(crate) const OKP_ALGS: [i32; 1] = [EDDSA];
 pub(crate) const EC2_ALGS: [i32; 3] = [ES256, ES384, ES512];
@@ -234,25 +258,60 @@ pub(crate) const ECDH_A: [i32; 6] = [
     ECDH_SS_A256KW,
 ];
 
-pub(crate) fn sign(alg: i32, key: &Vec<u8>, content: &Vec<u8>) -> Result<Vec<u8>, JsValue> {
+pub(crate) fn sign(
+    alg: i32,
+    crv: Option<i32>,
+    key: &Vec<u8>,
+    content: &Vec<u8>,
+) -> Result<Vec<u8>, JsValue> {
     let s: Vec<u8>;
     if alg == EDDSA {
+        let crv = crv.ok_or(JsValue::from("Missing curve"))?;
         use ed25519_compact::SecretKey;
-        let priv_key = match SecretKey::from_der(&key) {
+        let mut ed_key;
+        if crv == keys::ED25519 {
+            ed_key = DER_S2.to_vec();
+            ed_key.append(&mut key.clone());
+        } else if crv == keys::ED448 {
+            return Err(JsValue::from("Ed448 not implemented"));
+        } else {
+            return Err(JsValue::from("Invalid curve"));
+        }
+        let priv_key = match SecretKey::from_der(&ed_key) {
             Ok(v) => v,
             Err(_) => return Err(JsValue::from("Invalid EdDSA Private Key")),
         };
         let signature = priv_key.sign(&content, None);
         s = signature.as_slice().to_vec();
     } else if alg == ES256 {
+        let crv = crv.ok_or(JsValue::from("Missing curve"))?;
         use p256::ecdsa::{signature::Signer, SigningKey};
+        if crv != keys::P_256 {
+            return Err(JsValue::from("Only P_256 curve implemented for ES256"));
+        }
         let priv_key = match SigningKey::from_bytes(&key) {
             Ok(v) => v,
             Err(_) => return Err(JsValue::from("Invalid ECDSA Private Key")),
         };
         s = priv_key.sign(&content).to_vec();
+    } else if alg == ES256K {
+        let crv = crv.ok_or(JsValue::from("Missing curve"))?;
+        use k256::ecdsa::{signature::Signer, Signature, SigningKey};
+        if crv != keys::SECP256K1 {
+            return Err(JsValue::from("Invalid CRV"));
+        }
+        let priv_key = match SigningKey::from_slice(&key) {
+            Ok(v) => v,
+            Err(_) => return Err(JsValue::from("Invalid ECDSA Private Key")),
+        };
+        let sig: Signature = priv_key.sign(&content);
+        return Ok(sig.to_vec());
     } else if alg == ES384 {
+        let crv = crv.ok_or(JsValue::from("Missing curve"))?;
         use p384::ecdsa::{signature::Signer, SigningKey};
+        if crv != keys::P_384 {
+            return Err(JsValue::from("Only P_384 curve implemented for ES384"));
+        }
         let priv_key = match SigningKey::from_bytes(&key) {
             Ok(v) => v,
             Err(_) => return Err(JsValue::from("Invalid ECDSA Private Key")),
@@ -260,6 +319,29 @@ pub(crate) fn sign(alg: i32, key: &Vec<u8>, content: &Vec<u8>) -> Result<Vec<u8>
         s = priv_key.sign(&content).to_vec();
     } else if alg == ES512 {
         return Err(JsValue::from("ES512 not implemented"));
+    } else if [PS256, PS384, PS512].contains(&alg) {
+        use rsa::pkcs1::DecodeRsaPrivateKey;
+        use rsa::pss::SigningKey;
+        use rsa::signature::RandomizedSigner;
+        use rsa::signature::SignatureEncoding;
+        use rsa::RsaPrivateKey;
+        let priv_key = match RsaPrivateKey::from_pkcs1_der(&key) {
+            Ok(v) => v,
+            Err(_) => return Err(JsValue::from("Invalid RSA Public Key")),
+        };
+        if alg == PS256 {
+            let signing_key: SigningKey<Sha256> = SigningKey::new(priv_key);
+            let mut rng = rand::thread_rng();
+            s = signing_key.sign_with_rng(&mut rng, &content).to_vec();
+        } else if alg == PS384 {
+            let signing_key: SigningKey<Sha384> = SigningKey::new(priv_key);
+            let mut rng = rand::thread_rng();
+            s = signing_key.sign_with_rng(&mut rng, &content).to_vec();
+        } else {
+            let signing_key: SigningKey<Sha512> = SigningKey::new(priv_key);
+            let mut rng = rand::thread_rng();
+            s = signing_key.sign_with_rng(&mut rng, &content).to_vec();
+        }
     } else {
         return Err(JsValue::from("Invalid Algorithm"));
     }
@@ -268,6 +350,7 @@ pub(crate) fn sign(alg: i32, key: &Vec<u8>, content: &Vec<u8>) -> Result<Vec<u8>
 
 pub(crate) fn verify(
     alg: i32,
+    crv: Option<i32>,
     key: &Vec<u8>,
     content: &Vec<u8>,
     signature: &Vec<u8>,
@@ -275,17 +358,46 @@ pub(crate) fn verify(
     let v: bool;
     if alg == EDDSA {
         use ed25519_compact::{PublicKey, Signature};
-        let ec_public_key = match PublicKey::from_der(&key) {
+        let mut ed_key;
+        let crv = crv.ok_or(JsValue::from("Missing curve"))?;
+        if crv == keys::ED25519 {
+            ed_key = DER_P2.to_vec();
+            ed_key.append(&mut key.clone());
+        } else if crv == keys::ED448 {
+            return Err(JsValue::from("Ed448 not implemented"));
+        } else {
+            return Err(JsValue::from("Invalid curve"));
+        }
+        let ec_public_key = match PublicKey::from_der(&ed_key) {
             Ok(v) => v,
             Err(_) => return Err(JsValue::from("Invalid EdDSA Public Key")),
         };
-        let sig = match Signature::from_slice(&signature) {
+        let sig: Signature = match Signature::from_slice(&signature) {
             Ok(v) => v,
             Err(_) => return Err(JsValue::from("Invalid Signature")),
         };
         v = ec_public_key.verify(&content, &sig).is_ok();
+    } else if alg == ES256K {
+        use k256::ecdsa::{signature::Verifier, Signature, VerifyingKey};
+        let crv = crv.ok_or(JsValue::from("Invalid curve"))?;
+        if crv != keys::SECP256K1 {
+            return Err(JsValue::from("Invalid curve"));
+        }
+        let pub_key = match VerifyingKey::from_sec1_bytes(&key) {
+            Ok(v) => v,
+            Err(_) => return Err(JsValue::from("Invalid ECDSA Public Key")),
+        };
+        let signature: Signature = match Signature::try_from(signature.as_slice()) {
+            Ok(v) => v,
+            Err(_) => return Err(JsValue::from("Invalid Signature")),
+        };
+        v = pub_key.verify(content, &signature).is_ok();
     } else if alg == ES256 {
         use p256::ecdsa::{signature::Verifier, Signature, VerifyingKey};
+        let crv = crv.ok_or(JsValue::from("Invalid curve"))?;
+        if crv != keys::P_256 {
+            return Err(JsValue::from("Only P_256 curve implemented for ES256"));
+        }
         let pub_key = match VerifyingKey::from_sec1_bytes(&key) {
             Ok(v) => v,
             Err(_) => return Err(JsValue::from("Invalid ECDSA Public Key")),
@@ -297,6 +409,10 @@ pub(crate) fn verify(
         v = pub_key.verify(&content, &signature).is_ok();
     } else if alg == ES384 {
         use p384::ecdsa::{signature::Verifier, Signature, VerifyingKey};
+        let crv = crv.ok_or(JsValue::from("Invalid curve"))?;
+        if crv != keys::P_384 {
+            return Err(JsValue::from("Only P_384 curve implemented for ES384"));
+        }
         let pub_key = match VerifyingKey::from_sec1_bytes(&key) {
             Ok(v) => v,
             Err(_) => return Err(JsValue::from("Invalid ECDSA Public Key")),
@@ -308,6 +424,37 @@ pub(crate) fn verify(
         v = pub_key.verify(&content, &signature).is_ok();
     } else if alg == ES512 {
         return Err(JsValue::from("ES512 not implemnented"));
+    } else if [PS256, PS384, PS512].contains(&alg) {
+        use rsa::pkcs8::DecodePublicKey;
+        use rsa::pss::{Signature, VerifyingKey};
+        use rsa::signature::Verifier;
+        use rsa::RsaPublicKey;
+        let pub_key = match RsaPublicKey::from_public_key_der(&key) {
+            Ok(v) => v,
+            Err(_) => return Err(JsValue::from("Invalid RSA Public Key")),
+        };
+        if alg == PS256 {
+            let verifying_key: VerifyingKey<Sha256> = VerifyingKey::new(pub_key);
+            let signature: Signature = match Signature::try_from(signature.as_slice()) {
+                Ok(v) => v,
+                Err(_) => return Err(JsValue::from("Invalid Signature")),
+            };
+            v = verifying_key.verify(&content, &signature).is_ok();
+        } else if alg == PS384 {
+            let verifying_key: VerifyingKey<Sha384> = VerifyingKey::new(pub_key);
+            let signature: Signature = match Signature::try_from(signature.as_slice()) {
+                Ok(v) => v,
+                Err(_) => return Err(JsValue::from("Invalid Signature")),
+            };
+            v = verifying_key.verify(&content, &signature).is_ok();
+        } else {
+            let verifying_key: VerifyingKey<Sha512> = VerifyingKey::new(pub_key);
+            let signature: Signature = match Signature::try_from(signature.as_slice()) {
+                Ok(v) => v,
+                Err(_) => return Err(JsValue::from("Invalid Signature")),
+            };
+            v = verifying_key.verify(&content, &signature).is_ok();
+        }
     } else {
         return Err(JsValue::from("Invalid Algorithm"));
     }
@@ -318,8 +465,6 @@ pub(crate) fn mac(alg: i32, key: &Vec<u8>, content: &Vec<u8>) -> Result<Vec<u8>,
     let mut message_digest;
     let size;
     if alg == HMAC_256_64 {
-        use hmac::{Hmac, Mac};
-        type HmacSha256 = Hmac<Sha256>;
         let mut mac = match HmacSha256::new_from_slice(key.as_slice()) {
             Ok(v) => v,
             Err(_) => return Err(JsValue::from("Invalid MAC")),
@@ -328,8 +473,6 @@ pub(crate) fn mac(alg: i32, key: &Vec<u8>, content: &Vec<u8>) -> Result<Vec<u8>,
         message_digest = mac.finalize().into_bytes().to_vec();
         size = 8;
     } else if alg == HMAC_256_256 {
-        use hmac::{Hmac, Mac};
-        type HmacSha256 = Hmac<Sha256>;
         let mut mac = match HmacSha256::new_from_slice(key.as_slice()) {
             Ok(v) => v,
             Err(_) => return Err(JsValue::from("Invalid MAC")),
@@ -338,9 +481,7 @@ pub(crate) fn mac(alg: i32, key: &Vec<u8>, content: &Vec<u8>) -> Result<Vec<u8>,
         message_digest = mac.finalize().into_bytes().to_vec();
         size = 32;
     } else if alg == HMAC_384_384 {
-        use hmac::{Hmac, Mac};
-        type HmacSha256 = Hmac<Sha384>;
-        let mut mac = match HmacSha256::new_from_slice(key.as_slice()) {
+        let mut mac = match HmacSha384::new_from_slice(key.as_slice()) {
             Ok(v) => v,
             Err(_) => return Err(JsValue::from("Invalid MAC")),
         };
@@ -348,9 +489,7 @@ pub(crate) fn mac(alg: i32, key: &Vec<u8>, content: &Vec<u8>) -> Result<Vec<u8>,
         message_digest = mac.finalize().into_bytes().to_vec();
         size = 48;
     } else if alg == HMAC_512_512 {
-        use hmac::{Hmac, Mac};
-        type HmacSha256 = Hmac<Sha512>;
-        let mut mac = match HmacSha256::new_from_slice(key.as_slice()) {
+        let mut mac = match HmacSha512::new_from_slice(key.as_slice()) {
             Ok(v) => v,
             Err(_) => return Err(JsValue::from("Invalid MAC")),
         };
@@ -358,9 +497,7 @@ pub(crate) fn mac(alg: i32, key: &Vec<u8>, content: &Vec<u8>) -> Result<Vec<u8>,
         message_digest = mac.finalize().into_bytes().to_vec();
         size = 64;
     } else if alg == AES_MAC_128_64 {
-        use cbc_mac::{CbcMac, Mac};
-        type Daa = CbcMac<Aes128>;
-        let mut mac = match Daa::new_from_slice(&key) {
+        let mut mac = match Daa128::new_from_slice(&key) {
             Ok(v) => v,
             Err(_) => return Err(JsValue::from("Invalid MAC")),
         };
@@ -368,9 +505,7 @@ pub(crate) fn mac(alg: i32, key: &Vec<u8>, content: &Vec<u8>) -> Result<Vec<u8>,
         size = 8;
         message_digest = mac.finalize().into_bytes().to_vec();
     } else if alg == AES_MAC_256_64 {
-        use cbc_mac::{CbcMac, Mac};
-        type Daa = CbcMac<Aes256>;
-        let mut mac = match Daa::new_from_slice(&key) {
+        let mut mac = match Daa256::new_from_slice(&key) {
             Ok(v) => v,
             Err(_) => return Err(JsValue::from("Invalid MAC")),
         };
@@ -378,9 +513,7 @@ pub(crate) fn mac(alg: i32, key: &Vec<u8>, content: &Vec<u8>) -> Result<Vec<u8>,
         size = 8;
         message_digest = mac.finalize().into_bytes().to_vec();
     } else if alg == AES_MAC_128_128 {
-        use cbc_mac::{CbcMac, Mac};
-        type Daa = CbcMac<Aes128>;
-        let mut mac = match Daa::new_from_slice(&key) {
+        let mut mac = match Daa128::new_from_slice(&key) {
             Ok(v) => v,
             Err(_) => return Err(JsValue::from("Invalid MAC")),
         };
@@ -388,9 +521,7 @@ pub(crate) fn mac(alg: i32, key: &Vec<u8>, content: &Vec<u8>) -> Result<Vec<u8>,
         size = 16;
         message_digest = mac.finalize().into_bytes().to_vec();
     } else if alg == AES_MAC_256_128 {
-        use cbc_mac::{CbcMac, Mac};
-        type Daa = CbcMac<Aes256>;
-        let mut mac = match Daa::new_from_slice(&key) {
+        let mut mac = match Daa256::new_from_slice(&key) {
             Ok(v) => v,
             Err(_) => return Err(JsValue::from("Invalid MAC")),
         };
@@ -413,8 +544,6 @@ pub(crate) fn mac_verify(
     let mut message_digest;
     let size;
     if alg == HMAC_256_64 {
-        use hmac::{Hmac, Mac};
-        type HmacSha256 = Hmac<Sha256>;
         let mut mac = match HmacSha256::new_from_slice(key.as_slice()) {
             Ok(v) => v,
             Err(_) => return Err(JsValue::from("Invalid MAC")),
@@ -423,8 +552,6 @@ pub(crate) fn mac_verify(
         message_digest = mac.finalize().into_bytes().to_vec();
         size = 8;
     } else if alg == HMAC_256_256 {
-        use hmac::{Hmac, Mac};
-        type HmacSha256 = Hmac<Sha256>;
         let mut mac = match HmacSha256::new_from_slice(key.as_slice()) {
             Ok(v) => v,
             Err(_) => return Err(JsValue::from("Invalid MAC")),
@@ -434,9 +561,7 @@ pub(crate) fn mac_verify(
         message_digest = mac.finalize().into_bytes().to_vec();
         size = 32;
     } else if alg == HMAC_384_384 {
-        use hmac::{Hmac, Mac};
-        type HmacSha256 = Hmac<Sha384>;
-        let mut mac = match HmacSha256::new_from_slice(key.as_slice()) {
+        let mut mac = match HmacSha384::new_from_slice(key.as_slice()) {
             Ok(v) => v,
             Err(_) => return Err(JsValue::from("Invalid MAC")),
         };
@@ -444,9 +569,7 @@ pub(crate) fn mac_verify(
         message_digest = mac.finalize().into_bytes().to_vec();
         size = 48;
     } else if alg == HMAC_512_512 {
-        use hmac::{Hmac, Mac};
-        type HmacSha256 = Hmac<Sha512>;
-        let mut mac = match HmacSha256::new_from_slice(key.as_slice()) {
+        let mut mac = match HmacSha512::new_from_slice(key.as_slice()) {
             Ok(v) => v,
             Err(_) => return Err(JsValue::from("Invalid MAC")),
         };
@@ -454,9 +577,7 @@ pub(crate) fn mac_verify(
         message_digest = mac.finalize().into_bytes().to_vec();
         size = 64;
     } else if alg == AES_MAC_128_64 {
-        use cbc_mac::{CbcMac, Mac};
-        type Daa = CbcMac<Aes128>;
-        let mut mac = match Daa::new_from_slice(&key) {
+        let mut mac = match Daa128::new_from_slice(&key) {
             Ok(v) => v,
             Err(_) => return Err(JsValue::from("Invalid MAC")),
         };
@@ -464,9 +585,7 @@ pub(crate) fn mac_verify(
         size = 8;
         message_digest = mac.finalize().into_bytes().to_vec();
     } else if alg == AES_MAC_256_64 {
-        use cbc_mac::{CbcMac, Mac};
-        type Daa = CbcMac<Aes256>;
-        let mut mac = match Daa::new_from_slice(&key) {
+        let mut mac = match Daa256::new_from_slice(&key) {
             Ok(v) => v,
             Err(_) => return Err(JsValue::from("Invalid MAC")),
         };
@@ -474,9 +593,7 @@ pub(crate) fn mac_verify(
         size = 8;
         message_digest = mac.finalize().into_bytes().to_vec();
     } else if alg == AES_MAC_128_128 {
-        use cbc_mac::{CbcMac, Mac};
-        type Daa = CbcMac<Aes128>;
-        let mut mac = match Daa::new_from_slice(&key) {
+        let mut mac = match Daa128::new_from_slice(&key) {
             Ok(v) => v,
             Err(_) => return Err(JsValue::from("Invalid MAC")),
         };
@@ -484,9 +601,7 @@ pub(crate) fn mac_verify(
         size = 16;
         message_digest = mac.finalize().into_bytes().to_vec();
     } else if alg == AES_MAC_256_128 {
-        use cbc_mac::{CbcMac, Mac};
-        type Daa = CbcMac<Aes256>;
-        let mut mac = match Daa::new_from_slice(&key) {
+        let mut mac = match Daa256::new_from_slice(&key) {
             Ok(v) => v,
             Err(_) => return Err(JsValue::from("Invalid MAC")),
         };
@@ -968,14 +1083,14 @@ pub(crate) fn aes_key_unwrap(key: &Vec<u8>, alg: i32, cek: &Vec<u8>) -> Result<V
 }
 
 pub(crate) fn ecdh_derive_key(
-    crv_rec: &i32,
-    crv_send: &i32,
+    crv_rec: i32,
+    crv_send: i32,
     receiver_key: &Vec<u8>,
     sender_key: &Vec<u8>,
 ) -> Result<Vec<u8>, JsValue> {
     if crv_rec != crv_send {
         return Err("Elliptic Curves don't match".into());
-    } else if *crv_send == keys::P_256 {
+    } else if crv_send == keys::P_256 {
         use p256::{ecdh, PublicKey, SecretKey};
         return Ok(ecdh::diffie_hellman(
             match SecretKey::from_be_bytes(&sender_key) {
@@ -990,7 +1105,7 @@ pub(crate) fn ecdh_derive_key(
         )
         .raw_secret_bytes()
         .to_vec());
-    } else if *crv_send == keys::P_384 {
+    } else if crv_send == keys::P_384 {
         use p384::{ecdh, PublicKey, SecretKey};
         return Ok(ecdh::diffie_hellman(
             match SecretKey::from_be_bytes(&sender_key) {
@@ -1005,7 +1120,7 @@ pub(crate) fn ecdh_derive_key(
         )
         .raw_secret_bytes()
         .to_vec());
-    } else if *crv_send == keys::P_521 {
+    } else if crv_send == keys::P_521 {
         return Err(JsValue::from("P_521 not implemented"));
     } else {
         return Err(JsValue::from("Invalid Curve"));

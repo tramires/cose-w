@@ -5,9 +5,13 @@
 COSE Algorithms.
 
 - `es256`
+- `es256k`
 - `es384`
 - `es512`
 - `eddsa`
+- `ps256`
+- `ps384`
+- `ps512`
 - `a128gcm`
 - `a192gcm`
 - `a256gcm`
@@ -48,6 +52,7 @@ COSE Key types.
 
 - `okp`
 - `ec2`
+- `rsa`
 - `symmetric`
 - `reserved`
 
@@ -56,6 +61,7 @@ COSE Key types.
 COSE Key curves.
 
 - `p_256`
+- `secp256k1`
 - `p_384`
 - `p_521`
 - `x25519`

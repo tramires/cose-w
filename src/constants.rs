@@ -12,6 +12,10 @@ impl Alg {
         algs::ES256
     }
     #[wasm_bindgen(getter)]
+    pub fn es256k() -> i32 {
+        algs::ES256K
+    }
+    #[wasm_bindgen(getter)]
     pub fn es384() -> i32 {
         algs::ES384
     }
@@ -22,6 +26,22 @@ impl Alg {
     #[wasm_bindgen(getter)]
     pub fn eddsa() -> i32 {
         algs::EDDSA
+    }
+    #[wasm_bindgen(getter)]
+    pub fn ps256() -> i32 {
+        algs::PS256
+    }
+    #[wasm_bindgen(getter)]
+    pub fn ps384() -> i32 {
+        algs::PS384
+    }
+    #[wasm_bindgen(getter)]
+    pub fn ps512() -> i32 {
+        algs::PS512
+    }
+    #[wasm_bindgen(getter)]
+    pub fn sha_256() -> i32 {
+        algs::SHA_256
     }
     #[wasm_bindgen(getter)]
     pub fn a128gcm() -> i32 {
@@ -171,6 +191,10 @@ impl Kty {
         keys::EC2
     }
     #[wasm_bindgen(getter)]
+    pub fn rsa() -> i32 {
+        keys::RSA
+    }
+    #[wasm_bindgen(getter)]
     pub fn symmetric() -> i32 {
         keys::SYMMETRIC
     }
@@ -188,6 +212,10 @@ impl Crv {
     #[wasm_bindgen(getter)]
     pub fn p_256() -> i32 {
         keys::P_256
+    }
+    #[wasm_bindgen(getter)]
+    pub fn secp256k1() -> i32 {
+        keys::SECP256K1
     }
     #[wasm_bindgen(getter)]
     pub fn p_384() -> i32 {

@@ -1,6 +1,6 @@
 use crate::agent::CoseAgent;
+use crate::algs;
 use crate::cbor::{Decoder, Encoder};
-use crate::common;
 use crate::keys;
 use wasm_bindgen::prelude::*;
 
@@ -23,6 +23,54 @@ pub(crate) const PARTY_V_OTHER: i32 = -26;
 pub(crate) const EPHEMERAL_KEY: i32 = -1;
 pub(crate) const STATIC_KEY: i32 = -2;
 pub(crate) const STATIC_KEY_ID: i32 = -3;
+
+pub(crate) fn get_alg_id(alg: &str) -> Result<i32, JsValue> {
+    for i in 0..algs::SIGNING_ALGS.len() {
+        if algs::SIGNING_ALGS_NAMES[i] == alg {
+            return Ok(algs::SIGNING_ALGS[i]);
+        }
+    }
+    for i in 0..algs::ENCRYPT_ALGS.len() {
+        if algs::ENCRYPT_ALGS_NAMES[i] == alg {
+            return Ok(algs::ENCRYPT_ALGS[i]);
+        }
+    }
+    for i in 0..algs::MAC_ALGS.len() {
+        if algs::MAC_ALGS_NAMES[i] == alg {
+            return Ok(algs::MAC_ALGS[i]);
+        }
+    }
+    for i in 0..algs::KEY_DISTRIBUTION_ALGS.len() {
+        if algs::KEY_DISTRIBUTION_NAMES[i] == alg {
+            return Ok(algs::KEY_DISTRIBUTION_ALGS[i]);
+        }
+    }
+    Err("Invalid Algorithm".into())
+}
+pub(crate) fn get_kty_id(kty: &str) -> Result<i32, JsValue> {
+    for i in 0..keys::KTY_ALL.len() {
+        if keys::KTY_NAMES[i] == kty {
+            return Ok(keys::KTY_ALL[i]);
+        }
+    }
+    return Err("Invalid kty parameter".into());
+}
+pub(crate) fn get_crv_id(crv: &str) -> Result<i32, JsValue> {
+    for i in 0..keys::CURVES_ALL.len() {
+        if keys::CURVES_NAMES[i] == crv {
+            return Ok(keys::CURVES_ALL[i]);
+        }
+    }
+    return Err("Invalid crv parameter".into());
+}
+pub(crate) fn get_key_op_id(key_op: &str) -> Result<i32, JsValue> {
+    for i in 0..keys::KEY_OPS_ALL.len() {
+        if keys::KEY_OPS_NAMES[i] == key_op {
+            return Ok(keys::KEY_OPS_ALL[i]);
+        }
+    }
+    return Err("Invalid key op parameter".into());
+}
 
 #[derive(Clone, PartialEq)]
 pub(crate) enum ContentTypeTypes {
@@ -469,7 +517,7 @@ impl CoseHeader {
             self.alg = match decoder.signed() {
                 Ok(value) => Some(value),
                 Err(_) => match decoder.text() {
-                    Ok(value) => Some(common::get_alg_id(value)?),
+                    Ok(value) => Some(get_alg_id(value)?),
                     Err(_) => {
                         return Err(JsValue::from("Invalid COSE Structure"));
                     }

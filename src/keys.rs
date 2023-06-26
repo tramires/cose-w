@@ -1,10 +1,10 @@
 use crate::algs;
 use crate::cbor::{Decoder, Encoder};
-use crate::common;
+use crate::headers;
+use rsa::pkcs8::EncodePrivateKey;
+use rsa::pkcs8::EncodePublicKey;
+use rsa::{BigUint, RsaPrivateKey, RsaPublicKey};
 use wasm_bindgen::prelude::*;
-
-const DER_S: [u8; 16] = [48, 46, 2, 1, 0, 48, 5, 6, 3, 43, 101, 112, 4, 34, 4, 32];
-const DER_P: [u8; 12] = [48, 42, 48, 5, 6, 3, 43, 101, 112, 3, 33, 0];
 
 pub(crate) const ECDH_KTY: [i32; 2] = [OKP, EC2];
 pub(crate) const D: i32 = -4;
@@ -17,12 +17,26 @@ pub(crate) const ALG: i32 = 3;
 pub(crate) const KEY_OPS: i32 = 4;
 pub(crate) const BASE_IV: i32 = 5;
 
+pub(crate) const N: i32 = -1;
+pub(crate) const E: i32 = -2;
+pub(crate) const RSA_D: i32 = -3;
+pub(crate) const P: i32 = -4;
+pub(crate) const Q: i32 = -5;
+pub(crate) const DP: i32 = -6;
+pub(crate) const DQ: i32 = -7;
+pub(crate) const QINV: i32 = -8;
+pub(crate) const OTHER: i32 = -9;
+pub(crate) const RI: i32 = -10;
+pub(crate) const DI: i32 = -11;
+pub(crate) const TI: i32 = -12;
+
 pub(crate) const OKP: i32 = 1;
 pub(crate) const EC2: i32 = 2;
+pub(crate) const RSA: i32 = 3;
 pub(crate) const SYMMETRIC: i32 = 4;
 pub(crate) const RESERVED: i32 = 0;
-pub(crate) const KTY_ALL: [i32; 4] = [RESERVED, OKP, EC2, SYMMETRIC];
-pub(crate) const KTY_NAMES: [&str; 4] = ["Reserved", "OKP", "EC2", "Symmetric"];
+pub(crate) const KTY_ALL: [i32; 5] = [RESERVED, OKP, EC2, RSA, SYMMETRIC];
+pub(crate) const KTY_NAMES: [&str; 5] = ["Reserved", "OKP", "EC2", "RSA", "Symmetric"];
 
 pub(crate) const KEY_OPS_SIGN: i32 = 1;
 pub(crate) const KEY_OPS_VERIFY: i32 = 2;
@@ -60,16 +74,25 @@ pub(crate) const KEY_OPS_NAMES: [&str; 10] = [
 ];
 
 pub(crate) const P_256: i32 = 1;
+pub const SECP256K1: i32 = 8;
 pub(crate) const P_384: i32 = 2;
 pub(crate) const P_521: i32 = 3;
 pub(crate) const X25519: i32 = 4;
 pub(crate) const X448: i32 = 5;
 pub(crate) const ED25519: i32 = 6;
 pub(crate) const ED448: i32 = 7;
-pub(crate) const CURVES_ALL: [i32; 7] = [P_256, P_384, P_521, X25519, X448, ED25519, ED448];
+pub(crate) const CURVES_ALL: [i32; 8] =
+    [P_256, P_384, P_521, X25519, X448, ED25519, ED448, SECP256K1];
 const EC2_CRVS: [i32; 3] = [P_256, P_384, P_521];
-pub(crate) const CURVES_NAMES: [&str; 7] = [
-    "P-256", "P-384", "P-521", "X25519", "X448", "Ed25519", "Ed448",
+pub(crate) const CURVES_NAMES: [&str; 8] = [
+    "P-256",
+    "P-384",
+    "P-521",
+    "X25519",
+    "X448",
+    "Ed25519",
+    "Ed448",
+    "secp256k1",
 ];
 
 #[derive(Clone)]
@@ -87,6 +110,18 @@ pub struct CoseKey {
     pub(crate) k: Option<Vec<u8>>,
     pub(crate) kid: Option<Vec<u8>>,
     pub(crate) crv: Option<i32>,
+    pub(crate) n: Option<Vec<u8>>,
+    pub(crate) e: Option<Vec<u8>>,
+    pub(crate) rsa_d: Option<Vec<u8>>,
+    pub(crate) p: Option<Vec<u8>>,
+    pub(crate) q: Option<Vec<u8>>,
+    pub(crate) dp: Option<Vec<u8>>,
+    pub(crate) dq: Option<Vec<u8>>,
+    pub(crate) qinv: Option<Vec<u8>>,
+    pub(crate) other: Option<Vec<Vec<u8>>>,
+    pub(crate) ri: Option<Vec<u8>>,
+    pub(crate) di: Option<Vec<u8>>,
+    pub(crate) ti: Option<Vec<u8>>,
 }
 
 #[wasm_bindgen]
@@ -106,6 +141,18 @@ impl CoseKey {
             k: None,
             kid: None,
             crv: None,
+            n: None,
+            e: None,
+            rsa_d: None,
+            p: None,
+            q: None,
+            dp: None,
+            dq: None,
+            qinv: None,
+            other: None,
+            ri: None,
+            di: None,
+            ti: None,
         }
     }
 
@@ -217,30 +264,76 @@ impl CoseKey {
         self.reg_label(CRV_K);
         self.k = Some(k);
     }
+    pub fn set_n(&mut self, n: Vec<u8>) {
+        self.reg_label(N);
+        self.n = Some(n);
+    }
+    pub fn set_e(&mut self, e: Vec<u8>) {
+        self.reg_label(E);
+        self.e = Some(e);
+    }
+    pub fn set_rsa_d(&mut self, rsa_d: Vec<u8>) {
+        self.reg_label(RSA_D);
+        self.rsa_d = Some(rsa_d);
+    }
+    pub fn set_p(&mut self, p: Vec<u8>) {
+        self.reg_label(P);
+        self.p = Some(p);
+    }
+    pub fn set_q(&mut self, q: Vec<u8>) {
+        self.reg_label(Q);
+        self.q = Some(q);
+    }
+    pub fn set_dp(&mut self, dp: Vec<u8>) {
+        self.reg_label(DP);
+        self.dp = Some(dp);
+    }
+    pub fn set_dq(&mut self, dq: Vec<u8>) {
+        self.reg_label(DQ);
+        self.dq = Some(dq);
+    }
+    pub fn set_qinv(&mut self, qinv: Vec<u8>) {
+        self.reg_label(QINV);
+        self.qinv = Some(qinv);
+    }
+    pub fn set_other(&mut self, other: Vec<u8>) {
+        self.reg_label(OTHER);
+        self.other = Some(vec![other]);
+    }
+    pub fn set_ri(&mut self, ri: Vec<u8>) {
+        self.reg_label(RI);
+        self.ri = Some(ri);
+    }
+    pub fn set_di(&mut self, di: Vec<u8>) {
+        self.reg_label(DI);
+        self.di = Some(di);
+    }
+    pub fn set_ti(&mut self, ti: Vec<u8>) {
+        self.reg_label(TI);
+        self.ti = Some(ti);
+    }
 
     pub(crate) fn verify_curve(&self) -> Result<(), JsValue> {
-        let kty = self.kty.ok_or(JsValue::from("KTY missing"))?;
-        if kty == SYMMETRIC {
+        let kty = self.kty.ok_or(JsValue::from("MissingKTY"))?;
+        if kty == SYMMETRIC || kty == RSA {
             return Ok(());
         }
-        let crv = self.crv.ok_or(JsValue::from("Curve missing"))?;
-        if kty == OKP && ED25519 == crv {
+        let crv = self.crv.ok_or(JsValue::from("MissingCRV"))?;
+
+        if kty == OKP && (crv == ED25519 || crv == ED448) {
             Ok(())
         } else if kty == EC2 && EC2_CRVS.contains(&crv) {
             Ok(())
+        } else if self.alg.ok_or(JsValue::from("MissingAlg"))? == algs::ES256K && crv == SECP256K1 {
+            Ok(())
         } else {
-            Err(JsValue::from("Invalid Curve"))
+            Err(JsValue::from("InvalidCRV"))
         }
     }
 
     pub(crate) fn verify_kty(&self) -> Result<(), JsValue> {
-        let kty = self.kty.ok_or(JsValue::from("Missing KTY"))?;
-        let alg = self.alg.ok_or(JsValue::from("Missing Algorithm"))?;
-        if kty == OKP && algs::OKP_ALGS.contains(&alg) {
-        } else if kty == EC2 && algs::EC2_ALGS.contains(&alg) {
-        } else if kty == SYMMETRIC && algs::SYMMETRIC_ALGS.contains(&alg) {
-        } else {
-            return Err(JsValue::from("Invalid KTY"));
+        if !KTY_ALL.contains(&self.kty.ok_or(JsValue::from("MissingKTY"))?) {
+            return Err(JsValue::from("InvalidKTY"));
         }
         self.verify_curve()?;
         Ok(())
@@ -354,6 +447,34 @@ impl CoseKey {
                         .as_ref()
                         .ok_or(JsValue::from("Missing D parameter"))?,
                 )
+            } else if *i == N {
+                e.bytes(&self.n.as_ref().ok_or(JsValue::from("MissingN"))?)
+            } else if *i == E {
+                e.bytes(&self.e.as_ref().ok_or(JsValue::from("MissingE"))?)
+            } else if *i == RSA_D {
+                e.bytes(&self.rsa_d.as_ref().ok_or(JsValue::from("MissingRsaD"))?)
+            } else if *i == P {
+                e.bytes(&self.p.as_ref().ok_or(JsValue::from("MissingP"))?)
+            } else if *i == Q {
+                e.bytes(&self.q.as_ref().ok_or(JsValue::from("MissingQ"))?)
+            } else if *i == DP {
+                e.bytes(&self.dp.as_ref().ok_or(JsValue::from("MissingDP"))?)
+            } else if *i == DQ {
+                e.bytes(&self.dq.as_ref().ok_or(JsValue::from("MissingDQ"))?)
+            } else if *i == QINV {
+                e.bytes(&self.qinv.as_ref().ok_or(JsValue::from("MissingQINV"))?);
+            } else if *i == OTHER {
+                let other = self.other.as_ref().ok_or(JsValue::from("MissingOther"))?;
+                e.array(other.len());
+                for i in other {
+                    e.bytes(i);
+                }
+            } else if *i == RI {
+                e.bytes(&self.ri.as_ref().ok_or(JsValue::from("MissingRI"))?);
+            } else if *i == DI {
+                e.bytes(&self.di.as_ref().ok_or(JsValue::from("MissingDI"))?);
+            } else if *i == TI {
+                e.bytes(&self.ti.as_ref().ok_or(JsValue::from("MissingTI"))?);
             } else {
                 return Err(("Duplicate Label ".to_owned() + &i.to_string()).into());
             }
@@ -386,7 +507,7 @@ impl CoseKey {
             }
             if label == KTY {
                 self.kty = match d.text() {
-                    Ok(value) => Some(common::get_kty_id(value)?),
+                    Ok(value) => Some(headers::get_kty_id(value)?),
                     Err(_) => match d.signed() {
                         Ok(v) => Some(v),
                         Err(_) => {
@@ -397,7 +518,7 @@ impl CoseKey {
                 self.used.push(label);
             } else if label == ALG {
                 self.alg = match d.text() {
-                    Ok(value) => Some(common::get_alg_id(value)?),
+                    Ok(value) => Some(headers::get_alg_id(value)?),
                     Err(_) => match d.signed() {
                         Ok(v) => Some(v),
                         Err(_) => {
@@ -414,7 +535,7 @@ impl CoseKey {
                 for _i in 0..d.array()? {
                     match d.text() {
                         Ok(value) => {
-                            key_ops.push(common::get_key_op_id(value)?);
+                            key_ops.push(headers::get_key_op_id(value)?);
                         }
                         Err(_) => match d.signed() {
                             Ok(v) => {
@@ -436,7 +557,7 @@ impl CoseKey {
                     Ok(v) => self.k = Some(v),
                     Err(_) => {
                         self.crv = match d.text() {
-                            Ok(value) => Some(common::get_crv_id(value)?),
+                            Ok(value) => Some(headers::get_crv_id(value)?),
                             Err(_) => match d.signed() {
                                 Ok(v) => Some(v),
                                 Err(_) => {
@@ -468,6 +589,46 @@ impl CoseKey {
             } else if label == D {
                 self.d = Some(d.bytes()?);
                 self.used.push(label);
+            } else if label == N {
+                self.n = Some(d.bytes()?);
+                self.used.push(label);
+            } else if label == E {
+                self.e = Some(d.bytes()?);
+                self.used.push(label);
+            } else if label == RSA_D {
+                self.rsa_d = Some(d.bytes()?);
+                self.used.push(label);
+            } else if label == P {
+                self.p = Some(d.bytes()?);
+                self.used.push(label);
+            } else if label == Q {
+                self.q = Some(d.bytes()?);
+                self.used.push(label);
+            } else if label == DP {
+                self.dp = Some(d.bytes()?);
+                self.used.push(label);
+            } else if label == DQ {
+                self.dq = Some(d.bytes()?);
+                self.used.push(label);
+            } else if label == QINV {
+                self.qinv = Some(d.bytes()?);
+                self.used.push(label);
+            } else if label == OTHER {
+                let mut other = Vec::new();
+                for _ in 0..d.array()? {
+                    other.push(d.bytes()?);
+                }
+                self.other = Some(other);
+                self.used.push(label);
+            } else if label == RI {
+                self.ri = Some(d.bytes()?);
+                self.used.push(label);
+            } else if label == DI {
+                self.di = Some(d.bytes()?);
+                self.used.push(label);
+            } else if label == TI {
+                self.ti = Some(d.bytes()?);
+                self.used.push(label);
             } else {
                 return Err(JsValue::from(
                     "Invalid Label ".to_owned() + &label.to_string(),
@@ -478,72 +639,106 @@ impl CoseKey {
     }
 
     pub(crate) fn get_s_key(&self) -> Result<Vec<u8>, JsValue> {
-        let mut s_key = Vec::new();
-        let alg = self.alg.ok_or(JsValue::from("Missing Algorithm"))?;
-        if algs::SIGNING_ALGS.contains(&alg) || algs::ECDH_ALGS.contains(&alg) {
-            let mut d = self
+        let kty = self.kty.ok_or(JsValue::from("MissingKTY"))?;
+        if kty == EC2 || kty == OKP {
+            let d = self
                 .d
                 .as_ref()
-                .ok_or(JsValue::from("Missing D parameter"))?
-                .to_vec();
+                .ok_or(JsValue::from("MissingD())?.to_vec"))?
+                .clone();
             if d.len() <= 0 {
-                return Err(JsValue::from("Missing D parameter"));
+                return Err(JsValue::from("MissingD"));
             }
-            if algs::EDDSA == alg {
-                s_key = DER_S.to_vec();
-                s_key.append(&mut d);
-            } else {
-                s_key = d;
-            }
-        } else if algs::MAC_ALGS.contains(&alg)
-            || algs::ENCRYPT_ALGS.contains(&alg)
-            || algs::KEY_DISTRIBUTION_ALGS.contains(&alg)
-        {
+            Ok(d)
+        } else if kty == RSA {
+            let other = match self.other.clone() {
+                Some(v) => {
+                    let mut temp = Vec::new();
+                    for i in 0..v.len() {
+                        temp.push(BigUint::from_bytes_be(&v[i]));
+                    }
+                    temp
+                }
+                None => Vec::new(),
+            };
+            match RsaPrivateKey::from_components(
+                BigUint::from_bytes_be(self.n.as_ref().ok_or(JsValue::from("Missing N"))?),
+                BigUint::from_bytes_be(self.e.as_ref().ok_or(JsValue::from("Missing N"))?),
+                BigUint::from_bytes_be(self.d.as_ref().ok_or(JsValue::from("Missing N"))?),
+                other,
+            ) {
+                Ok(v) => match v.to_pkcs8_der() {
+                    Ok(v2) => {
+                        return Ok(v2.to_bytes().to_vec());
+                    }
+                    Err(_) => {
+                        return Err(JsValue::from("RSA Public Key error"));
+                    }
+                },
+                Err(_) => {
+                    return Err(JsValue::from("RSA Public Key error"));
+                }
+            };
+        } else if kty == SYMMETRIC {
             let k = self
                 .k
                 .as_ref()
-                .ok_or(JsValue::from("Missing K parameter"))?
-                .to_vec();
+                .ok_or(JsValue::from("MissingK())?.to_vec"))?
+                .clone();
             if k.len() <= 0 {
-                return Err(JsValue::from("Missing K parameter"));
+                return Err(JsValue::from("MissingK"));
             }
-            s_key = k;
+            Ok(k)
+        } else {
+            Err(JsValue::from("InvalidKTY"))
         }
-        Ok(s_key)
     }
-    pub(crate) fn get_pub_key(&self, alg: i32) -> Result<Vec<u8>, JsValue> {
-        let mut pub_key: Vec<u8>;
-        if algs::SIGNING_ALGS.contains(&alg) || algs::ECDH_ALGS.contains(&alg) {
+    pub(crate) fn get_pub_key(&self) -> Result<Vec<u8>, JsValue> {
+        let kty = self.kty.ok_or(JsValue::from("MissingKTY"))?;
+        if kty == EC2 || kty == OKP {
             let mut x = self
                 .x
                 .as_ref()
-                .ok_or(JsValue::from("Missing X parameter"))?
-                .to_vec();
+                .ok_or(JsValue::from("MissingX())?.to_vec"))?
+                .clone();
             if x.len() <= 0 {
-                return Err(JsValue::from("Missing X parameter"));
+                return Err(JsValue::from("MissingX"));
             }
-            if algs::EDDSA == alg {
-                pub_key = DER_P.to_vec();
-                pub_key.append(&mut x);
-            } else {
-                if self.y == None {
-                    pub_key = vec![3];
-                    pub_key.append(&mut x);
-                } else {
-                    let mut y = self
-                        .y
-                        .as_ref()
-                        .ok_or(JsValue::from("Missing Y parameter"))?
-                        .to_vec();
+            let mut pub_key;
+            if kty == EC2 {
+                if self.y != None && self.y.as_ref().unwrap().len() > 0 {
+                    let mut y = self.y.as_ref().unwrap().to_vec();
                     pub_key = vec![4];
                     pub_key.append(&mut x);
                     pub_key.append(&mut y);
+                } else {
+                    pub_key = vec![3];
+                    pub_key.append(&mut x);
                 }
+            } else {
+                pub_key = x;
             }
+            Ok(pub_key)
+        } else if kty == RSA {
+            match RsaPublicKey::new(
+                BigUint::from_bytes_be(self.n.as_ref().ok_or(JsValue::from("Missing N"))?),
+                BigUint::from_bytes_be(self.e.as_ref().ok_or(JsValue::from("Missing N"))?),
+            ) {
+                Ok(v) => match v.to_public_key_der() {
+                    Ok(v2) => {
+                        return Ok(v2.to_vec());
+                    }
+                    Err(_) => {
+                        return Err(JsValue::from("RSA Public Key error"));
+                    }
+                },
+                Err(_) => {
+                    return Err(JsValue::from("RSA Public Key error"));
+                }
+            };
         } else {
-            return Err(JsValue::from("Invalid Algorithm"));
+            Err(JsValue::from("InvalidKTY"))
         }
-        Ok(pub_key)
     }
 }
 
@@ -561,6 +756,14 @@ impl CoseKeySet {
             cose_keys: Vec::new(),
             bytes: Vec::new(),
         }
+    }
+    #[wasm_bindgen(getter)]
+    pub fn bytes(&self) -> Vec<u8> {
+        self.bytes.clone()
+    }
+
+    pub fn set_bytes(&mut self, bytes: Vec<u8>) {
+        self.bytes = bytes;
     }
 
     pub fn add_key(&mut self, key: CoseKey) {

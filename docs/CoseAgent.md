@@ -11,9 +11,10 @@ When decoding a COSE message, after the function `init_decoding`, all the COSE m
 
 ## Methods 
 
+- Counter signatures:
 - `new_counter_sig()`: Initiates a CoseAgent with the Counter Signer context.
 - `set_header(header: CoseHeader)`: Sets the COSE header.
-- `key(key: keys::CoseKey)`: Sets key to be used in case of cose-encrypt0 message.
+- `key(key: keys::CoseKey)`: Sets the key to be used.
 - `ephemeral_key(key: keys::CoseKey, prot: bool, crit: bool)`: Adds the ephemeral ECDH COSE key to the CoseAgent.
 - `static_key(key: keys::CoseKey, prot: bool, crit: bool)`: Adds the static ECDH COSE key to the CoseAgent.
 - `set_static_kid(kid: Vec<u8>, key: keys::CoseKey, prot: bool, crit: bool)`: Adds the static ECDH COSE key and static key ID to the CoseAgent.
