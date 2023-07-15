@@ -423,7 +423,7 @@ pub(crate) fn verify(
         };
         v = pub_key.verify(&content, &signature).is_ok();
     } else if alg == ES512 {
-        return Err(JsValue::from("ES512 not implemnented"));
+        return Err(JsValue::from("ES512 not implemented"));
     } else if [PS256, PS384, PS512].contains(&alg) {
         use rsa::pkcs8::DecodePublicKey;
         use rsa::pss::{Signature, VerifyingKey};
@@ -1140,7 +1140,7 @@ pub(crate) fn hkdf(
     };
     if [ECDH_ES_HKDF_512, ECDH_SS_HKDF_512, DIRECT_HKDF_SHA_512].contains(&alg) {
         let hk = Hkdf::<Sha512>::new(salt, &ikm);
-        let mut okm = [0u8; 32];
+        let mut okm = [0u8; 64];
         match hk.expand(&info_input, &mut okm) {
             Ok(_) => (),
             Err(_) => return Err(JsValue::from("Error during HKDF expand")),
@@ -1148,7 +1148,7 @@ pub(crate) fn hkdf(
         return Ok(okm[..length as usize].to_vec());
     }
     let hk = Hkdf::<Sha256>::new(salt, &ikm);
-    let mut okm = [0u8; 32];
+    let mut okm = [0u8; 64];
     match hk.expand(&info_input, &mut okm) {
         Ok(_) => (),
         Err(_) => return Err(JsValue::from("Error during HKDF expand")),

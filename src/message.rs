@@ -124,19 +124,31 @@ impl CoseMessage {
     pub fn payload(&self) -> Vec<u8> {
         self.payload.clone()
     }
-    #[wasm_bindgen(getter)]
-    pub fn counters_len(&self) -> usize {
-        self.header.counters.len()
+
+    pub fn counters_len(&self, agent: Option<usize>) -> usize {
+        match agent {
+            Some(v) => self.agents[v].header.counters.len(),
+            None => self.header.counters.len(),
+        }
     }
 
-    pub fn counter_header(&self, i: usize) -> CoseHeader {
-        self.header.counters[i].header.clone()
+    pub fn set_ecdh_key(&mut self, agent: usize, key: keys::CoseKey) {
+        self.agents[agent].header.set_ecdh_key(key);
     }
-
-    pub fn counter(&mut self, kid: Vec<u8>) -> Result<Vec<usize>, JsValue> {
+    pub fn counter_header(&self, i: usize, agent: Option<usize>) -> CoseHeader {
+        match agent {
+            Some(v) => self.agents[v].header.counters[i].header.clone(),
+            None => self.header.counters[i].header.clone(),
+        }
+    }
+    pub fn counter(&mut self, kid: Vec<u8>, agent: Option<usize>) -> Result<Vec<usize>, JsValue> {
         let mut counters: Vec<usize> = Vec::new();
-        for i in 0..self.header.counters.len() {
-            if self.header.counters[i]
+        let c = match agent {
+            Some(v) => &self.agents[v].header.counters,
+            None => &self.header.counters,
+        };
+        for i in 0..c.len() {
+            if c[i]
                 .header
                 .kid
                 .as_ref()
@@ -161,10 +173,22 @@ impl CoseMessage {
             Err(JsValue::from("Invalid index provided"))
         }
     }
-
-    pub fn add_counter_key(&mut self, i: usize, key: &keys::CoseKey) -> Result<(), JsValue> {
-        self.header.counters[i].key(key)?;
-        Ok(())
+    pub fn add_counter_key(
+        &mut self,
+        i: usize,
+        agent: Option<usize>,
+        key: &keys::CoseKey,
+    ) -> Result<(), JsValue> {
+        match agent {
+            Some(v) => {
+                self.agents[v].header.counters[i].key(key)?;
+                Ok(())
+            }
+            None => {
+                self.header.counters[i].key(key)?;
+                Ok(())
+            }
+        }
     }
 
     pub fn set_header(&mut self, header: CoseHeader) {
@@ -282,8 +306,25 @@ impl CoseMessage {
         &self,
         external_aad: Option<Vec<u8>>,
         counter: &mut CoseAgent,
+        agent: Option<usize>,
     ) -> Result<(), JsValue> {
-        if self.secured.len() == 0 {
+        let to_sig;
+        let ph_bstr;
+        match agent {
+            Some(v) => {
+                to_sig = &self.agents[v].payload;
+                ph_bstr = &self.agents[v].ph_bstr;
+            }
+            None => {
+                if (self.context == SIG || self.context == MAC) {
+                    to_sig = &self.payload;
+                } else {
+                    to_sig = &self.secured;
+                }
+                ph_bstr = &self.ph_bstr;
+            }
+        };
+        if to_sig.len() == 0 && agent == None {
             return Err(JsValue::from(
                 "Missing ".to_owned() + MISS_ERR[self.context],
             ));
@@ -292,7 +333,7 @@ impl CoseMessage {
                 None => Vec::new(),
                 Some(v) => v,
             };
-            counter.sign(&self.secured, &aead, &self.ph_bstr)?;
+            counter.sign(to_sig, &aead, ph_bstr)?;
             Ok(())
         }
     }
@@ -301,8 +342,25 @@ impl CoseMessage {
         &self,
         external_aad: Option<Vec<u8>>,
         counter: &mut CoseAgent,
+        agent: Option<usize>,
     ) -> Result<Vec<u8>, JsValue> {
-        if self.secured.len() == 0 {
+        let to_sig;
+        let ph_bstr;
+        match agent {
+            Some(v) => {
+                to_sig = &self.agents[v].payload;
+                ph_bstr = &self.agents[v].ph_bstr;
+            }
+            None => {
+                if (self.context == SIG || self.context == MAC) {
+                    to_sig = &self.payload;
+                } else {
+                    to_sig = &self.secured;
+                }
+                ph_bstr = &self.ph_bstr;
+            }
+        };
+        if to_sig.len() == 0 && agent == None {
             return Err(JsValue::from(
                 "Missing ".to_owned() + MISS_ERR[self.context],
             ));
@@ -311,24 +369,41 @@ impl CoseMessage {
                 None => Vec::new(),
                 Some(v) => v,
             };
-            counter.get_to_sign(&self.secured, &aead, &self.ph_bstr)
+            counter.get_to_sign(to_sig, &aead, &ph_bstr)
         }
     }
     pub fn get_to_verify(
         &mut self,
         external_aad: Option<Vec<u8>>,
         counter: usize,
+        agent: Option<usize>,
     ) -> Result<Vec<u8>, JsValue> {
-        if self.secured.len() == 0 {
-            return Err(JsValue::from(
-                "Missing ".to_owned() + MISS_ERR[self.context],
-            ));
-        } else {
-            let aead = match external_aad {
-                None => Vec::new(),
-                Some(v) => v,
-            };
-            self.header.counters[counter].get_to_sign(&self.secured, &aead, &self.ph_bstr)
+        let aead = match external_aad {
+            None => Vec::new(),
+            Some(v) => v,
+        };
+        match agent {
+            Some(v) => {
+                let to_sig = self.agents[v].payload.clone();
+                let ph_bstr = self.agents[v].ph_bstr.clone();
+                self.agents[v].header.counters[counter].get_to_sign(&to_sig, &aead, &ph_bstr)
+            }
+            None => {
+                let to_sig;
+                if (self.context == SIG || self.context == MAC) {
+                    to_sig = &self.payload;
+                } else {
+                    to_sig = &self.secured;
+                }
+                let ph_bstr = &self.ph_bstr;
+                if to_sig.len() == 0 {
+                    return Err(JsValue::from(
+                        "Missing ".to_owned() + MISS_ERR[self.context],
+                    ));
+                } else {
+                    self.header.counters[counter].get_to_sign(to_sig, &aead, ph_bstr)
+                }
+            }
         }
     }
 
@@ -336,14 +411,28 @@ impl CoseMessage {
         &mut self,
         external_aad: Option<Vec<u8>>,
         counter: usize,
+        agent: Option<usize>,
     ) -> Result<(), JsValue> {
         let to_sig;
-        if self.context == SIG && self.agents.len() > 0 {
-            to_sig = &self.payload;
-        } else {
-            to_sig = &self.secured;
+        let ph_bstr;
+        let counter_to_ver;
+        match agent {
+            Some(v) => {
+                to_sig = &self.agents[v].payload;
+                ph_bstr = &self.agents[v].ph_bstr;
+                counter_to_ver = &self.agents[v].header.counters[counter];
+            }
+            None => {
+                if (self.context == SIG || self.context == MAC) {
+                    to_sig = &self.payload;
+                } else {
+                    to_sig = &self.secured;
+                }
+                ph_bstr = &self.ph_bstr;
+                counter_to_ver = &self.header.counters[counter];
+            }
         }
-        if to_sig.len() == 0 {
+        if agent == None && to_sig.len() == 0 {
             return Err(JsValue::from(
                 "Missing ".to_owned() + MISS_ERR[self.context],
             ));
@@ -352,7 +441,7 @@ impl CoseMessage {
                 None => Vec::new(),
                 Some(v) => v,
             };
-            if self.header.counters[counter].verify(to_sig, &aead, &self.ph_bstr)? {
+            if counter_to_ver.verify(to_sig, &aead, ph_bstr)? {
                 Ok(())
             } else {
                 Err(JsValue::from("Invalid Counter Signature"))
@@ -360,7 +449,11 @@ impl CoseMessage {
         }
     }
 
-    pub fn add_counter_sig(&mut self, counter: CoseAgent) -> Result<(), JsValue> {
+    pub fn add_counter_sig(
+        &mut self,
+        counter: CoseAgent,
+        agent: Option<usize>,
+    ) -> Result<(), JsValue> {
         if !algs::SIGNING_ALGS.contains(&counter.header.alg.ok_or(JsValue::from("Missing alg"))?) {
             return Err(JsValue::from(
                 "Invalid algorithm for COUNTER_SIGNATURE context",
@@ -369,13 +462,17 @@ impl CoseMessage {
         if counter.context != cose_struct::COUNTER_SIGNATURE {
             return Err(JsValue::from("Invalid context"));
         }
-        if self.header.unprotected.contains(&COUNTER_SIG) {
-            self.header.counters.push(counter);
+        let header = match agent {
+            Some(v) => &mut self.agents[v].header,
+            None => &mut self.header,
+        };
+        if header.unprotected.contains(&COUNTER_SIG) {
+            header.counters.push(counter);
             Ok(())
         } else {
-            self.header.counters.push(counter);
-            self.header.remove_label(COUNTER_SIG);
-            self.header.unprotected.push(COUNTER_SIG);
+            header.counters.push(counter);
+            header.remove_label(COUNTER_SIG);
+            header.unprotected.push(COUNTER_SIG);
             Ok(())
         }
     }

@@ -121,9 +121,9 @@ mod test_vecs {
 
         verify.decode(None, Some(v1)).unwrap();
 
-        let counter = verify.counter(b"11".to_vec()).unwrap()[0];
+        let counter = verify.counter(b"11".to_vec(), None).unwrap()[0];
         verify.header.counters[counter].key(&key).unwrap();
-        verify.counters_verify(None, counter).unwrap();
+        verify.counters_verify(None, counter, None).unwrap();
     }
     #[wasm_bindgen_test]
     fn c21() {

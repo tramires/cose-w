@@ -30,6 +30,17 @@ Counter signature in cose-sign1 message.
 
 ### Encode
 ```js
+var {
+  CoseKey,
+  CoseMessage,
+  CoseHeader,
+  CoseAgent,
+  Alg,
+  Kty,
+  Crv,
+  KeyOp
+} = require('cose-w');
+
 let msg = Buffer.from('546869732069732074686520636F6E74656E742E', 'hex');
 
 // Prepare signer cose-key
@@ -79,6 +90,15 @@ let bytes = sign.encode(true);
 
 ### Decode
 ```js
+var {
+  CoseKey,
+  CoseMessage,
+  Alg,
+  Kty,
+  Crv,
+  KeyOp
+} = require('cose-w');
+
 // Prepare signer cose-key
 let key1 = new CoseKey();
 key1.set_kty(Kty.ec2);
@@ -99,7 +119,7 @@ key2.set_key_ops([KeyOp.verify]);
 
 // Prepare CoseSign with the cose-sign1 bytes
 let verify = CoseMessage.new_sign();
-verify.set_bytes(Buffer.from("d28446a20126044101a1078346a20441000126a0584019b7fc0f2b13cd8d1891beb3d5fcadb79dfd14384f48059454cbab16e01503a261e8f5dc47aa998782b7baa74b260ec5dd3694e44f88c99c5db7f61ff8aca23954546869732069732074686520636f6e74656e742e5840cf6f9dd76e5c7252e72bf6bf685fced5d82309c4ae0df229a501529636106ae99ddb5efc8b73c208ddbc815f91d71dc9b7db8ce6390f76ad01ba256fc0eae575", "hex"));
+verify.set_bytes(Buffer.from("d28446a20126044101a1078346a20441000126a05840b94eb54af9aba9250c3aabf65c7da5583d0c1b4e813f9dead8b5ac0fbc3afa2ae57ae88905c80f100771394501bc447d6064afcbdf88bb0620863f1e0827406554546869732069732074686520636f6e74656e742e5840cf6f9dd76e5c7252e72bf6bf685fced5d82309c4ae0df229a501529636106ae99ddb5efc8b73c208ddbc815f91d71dc9b7db8ce6390f76ad01ba256fc0eae575", "hex"));
 
 // Init decoding
 verify.init_decoder(null);
@@ -110,6 +130,6 @@ let payload = verify.decode(null, null);
 
 // Get counter signer and verify counter signature
 let i = verify.counter([0]);
-verify.add_counter_key(i, key1);
-verify.counters_verify(null, i);
+verify.add_counter_key(i, null, key1);
+verify.counters_verify(null, i, null);
 ```

@@ -18,6 +18,16 @@ Encode/decode cose-sign1.
 
 ### Encode cose-sign1 
 ```js
+var {
+  CoseKey,
+  CoseHeader,
+  CoseMessage,
+  Alg,
+  Kty,
+  Crv,
+  KeyOp
+} = require('cose-w');
+
 // Message to sign, "This is the content."
 let msg = Buffer.from('546869732069732074686520636F6E74656E742E', 'hex');
 
@@ -45,6 +55,15 @@ let bytes = signer.encode(true);
 
 ### Decode cose-sign1 
 ```js
+var {
+  CoseKey,
+  CoseMessage,
+  Alg,
+  Kty,
+  Crv,
+  KeyOp
+} = require('cose-w');
+
 // Prepare cose-key
 let key = new CoseKey();
 key.set_kty(Kty.ec2);
@@ -72,6 +91,15 @@ Encode/decode cose-encrypt0.
 
 ### Encode cose-encrypt0
 ```js
+var {
+  CoseKey,
+  CoseHeader,
+  CoseMessage,
+  Alg,
+  Kty,
+  KeyOp
+} = require('cose-w');
+
 // Message to encrypt, "This is the content."
 let msg = Buffer.from('546869732069732074686520636F6E74656E742E', 'hex');
 
@@ -89,7 +117,7 @@ header.set_iv(Buffer.from('89f52f65a1c580933b5261a7', 'hex'), true, false);
 
 // Generate CoseEncrypt and encode the cose-encrypt0 final message
 let enc = CoseMessage.new_encrypt();
-Enc.set_header(header);
+enc.set_header(header);
 enc.set_payload(msg);
 enc.key(key);
 enc.secure_content(null);
@@ -98,6 +126,15 @@ let bytes = enc.encode(true);
 
 ### Decode cose-encrypt0
 ```js
+var {
+  CoseKey,
+  CoseMessage,
+  Alg,
+  Kty,
+  KeyOp
+} = require('cose-w');
+var assert = require('assert');
+
 // "This is the content."
 let expected_msg = Buffer.from('546869732069732074686520636F6E74656E742E', 'hex');
 
@@ -127,6 +164,15 @@ Encode/decode cose-mac0.
 
 ### Encode cose-mac0
 ```js
+var {
+  CoseKey,
+  CoseHeader,
+  CoseMessage,
+  Alg,
+  Kty,
+  KeyOp
+} = require('cose-w');
+
 // Message to MAC, "This is the content."
 let msg = Buffer.from('546869732069732074686520636F6E74656E742E', 'hex');
 
@@ -151,6 +197,14 @@ let bytes = mac.encode(true);
 ```
 ### Decode cose-mac0
 ```js
+var {
+  CoseKey,
+  CoseMessage,
+  Alg,
+  Kty,
+  KeyOp
+} = require('cose-w');
+
 // Prepare cose-key
 let key = new CoseKey();
 key.set_kty(Kty.symmetric);

@@ -61,6 +61,17 @@ Encode/decode cose-sign.
 
 ### Encode cose-sign 
 ```js
+var {
+  CoseKey,
+  CoseMessage,
+  CoseHeader,
+  CoseAgent,
+  Alg,
+  Kty,
+  Crv,
+  KeyOp
+} = require('cose-w');
+
  // Message to sign, "This is the content."
 let msg = Buffer.from('546869732069732074686520636F6E74656E742E', 'hex');
 
@@ -109,6 +120,15 @@ let bytes = sign.encode(true);
 
 ### Decode cose-sign 
 ```js
+var {
+  CoseKey,
+  CoseMessage,
+  Alg,
+  Kty,
+  Crv,
+  KeyOp
+} = require('cose-w');
+
 // Prepare signer 1 cose-key
 let key1 = new CoseKey();
 key1.set_kty(Kty.ec2);
@@ -151,6 +171,17 @@ Encode/decode cose-encrypt.
 
 ### Encode cose-encrypt
 ```js
+var {
+  CoseKey,
+  CoseMessage,
+  CoseHeader,
+  CoseAgent,
+  Alg,
+  Kty,
+  Crv,
+  KeyOp
+} = require('cose-w');
+
 // Message to encrypt, "This is the content."
 let msg = Buffer.from('546869732069732074686520636F6E74656E742E', 'hex');
 
@@ -211,6 +242,16 @@ let bytes = enc.encode(true);
 ```
 ### Decode cose-encrypt
 ```js
+var {
+  CoseKey,
+  CoseMessage,
+  Alg,
+  Kty,
+  Crv,
+  KeyOp
+} = require('cose-w');
+var assert = require('assert');
+
 // Expected messsage to decrypt
 let expected_msg = Buffer.from('546869732069732074686520636F6E74656E742E', 'hex');
 
@@ -256,6 +297,17 @@ Encode/decode cose-mac.
 
 ### Encode cose-mac
 ```js
+var {
+  CoseKey,
+  CoseMessage,
+  CoseHeader,
+  CoseAgent,
+  Alg,
+  Kty,
+  Crv,
+  KeyOp
+} = require('cose-w');
+
 // Message to MAC, "This is the content."
 let msg = Buffer.from('546869732069732074686520636F6E74656E742E', 'hex');
 
@@ -316,6 +368,15 @@ let bytes = mac.encode(true);
 ```
 ### Decode cose-mac
 ```js
+var {
+  CoseKey,
+  CoseMessage,
+  Alg,
+  Kty,
+  Crv,
+  KeyOp
+} = require('cose-w');
+
 // Prepare recipient 1 cose-key
 let key1 = new CoseKey();
 key1.set_kty(Kty.symmetric);

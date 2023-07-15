@@ -103,7 +103,7 @@ pub(crate) fn verify_sig(
     }
     e.bytes(external_aad.as_slice());
     e.bytes(payload.as_slice());
-    Ok(algs::verify(*alg, *crv, &key, &e.encoded(), &signature).unwrap())
+    Ok(algs::verify(*alg, *crv, &key, &e.encoded(), &signature)?)
 }
 
 pub(crate) const MAC: &str = "MAC";

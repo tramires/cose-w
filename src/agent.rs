@@ -253,7 +253,7 @@ impl CoseAgent {
             }
             return Ok(cek.to_vec());
         } else if algs::D_HA.contains(alg) {
-            return Err(JsValue::from("Not implemented DIRECT_HKDF_AES"));
+            return Err(JsValue::from("DIRECT_HKDF_AES not implemented"));
         } else if algs::D_HS.contains(alg) {
             if self.header.party_u_nonce == None && self.header.salt == None {
                 return Err(JsValue::from("Party U nonce or salt required"));
@@ -368,7 +368,8 @@ impl CoseAgent {
         if self.ph_bstr.len() > 0 {
             self.header.decode_protected_bstr(self.ph_bstr.clone())?;
         }
-        self.header.decode_unprotected(d, true)?;
+        self.header
+            .decode_unprotected(d, self.context == cose_struct::COUNTER_SIGNATURE)?;
         self.payload = d.bytes()?;
         Ok(())
     }
