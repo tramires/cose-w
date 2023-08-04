@@ -57,6 +57,7 @@ pub struct CoseMessage {
     key_encode: bool,
     key_decode: bool,
     crv: Option<i32>,
+    base_iv: Option<Vec<u8>>,
     pub(crate) agents: Vec<CoseAgent>,
     context: usize,
 }
@@ -75,6 +76,7 @@ impl CoseMessage {
             key_encode: false,
             key_decode: false,
             agents: Vec::new(),
+            base_iv: None,
             crv: None,
             context: SIG,
         }
@@ -91,6 +93,7 @@ impl CoseMessage {
             key_encode: false,
             key_decode: false,
             agents: Vec::new(),
+            base_iv: None,
             crv: None,
             context: ENC,
         }
@@ -107,6 +110,7 @@ impl CoseMessage {
             key_encode: false,
             key_decode: false,
             agents: Vec::new(),
+            base_iv: None,
             crv: None,
             context: MAC,
         }
@@ -130,6 +134,17 @@ impl CoseMessage {
             Some(v) => self.agents[v].header.counters.len(),
             None => self.header.counters.len(),
         }
+    }
+    pub fn set_pub_other(&mut self, agent: usize, other: Vec<u8>) {
+        self.agents[agent].header.pub_other(other);
+    }
+    pub fn set_priv_info(&mut self, agent: usize, info: Vec<u8>) {
+        self.agents[agent].header.priv_info(info);
+    }
+    pub fn set_party_identity(&mut self, agent: usize, id: Vec<u8>, u: bool) {
+        self.agents[agent]
+            .header
+            .set_party_identity(id, false, false, u);
     }
 
     pub fn set_ecdh_key(&mut self, agent: usize, key: keys::CoseKey) {
@@ -271,14 +286,8 @@ impl CoseMessage {
                 }
             }
         } else {
-            if self.context == ENC && self.header.partial_iv != None {
-                self.header.iv = Some(algs::gen_iv(
-                    &mut self.header.partial_iv.as_mut().unwrap(),
-                    cose_key
-                        .base_iv
-                        .as_ref()
-                        .ok_or(JsValue::from("Missing Base IV"))?,
-                ));
+            if self.context == ENC {
+                self.base_iv = cose_key.base_iv.clone();
             }
             let key = cose_key.get_s_key()?;
             if key.len() > 0 {
@@ -312,11 +321,16 @@ impl CoseMessage {
         let ph_bstr;
         match agent {
             Some(v) => {
+                if !self.agents[v].enc {
+                    return Err(JsValue::from(
+                        "Data needs to be secured before counter signatures",
+                    ));
+                }
                 to_sig = &self.agents[v].payload;
                 ph_bstr = &self.agents[v].ph_bstr;
             }
             None => {
-                if (self.context == SIG || self.context == MAC) {
+                if self.context != ENC {
                     to_sig = &self.payload;
                 } else {
                     to_sig = &self.secured;
@@ -348,11 +362,16 @@ impl CoseMessage {
         let ph_bstr;
         match agent {
             Some(v) => {
+                if !self.agents[v].enc {
+                    return Err(JsValue::from(
+                        "Data needs to be secured before counter signatures",
+                    ));
+                }
                 to_sig = &self.agents[v].payload;
                 ph_bstr = &self.agents[v].ph_bstr;
             }
             None => {
-                if (self.context == SIG || self.context == MAC) {
+                if self.context != ENC {
                     to_sig = &self.payload;
                 } else {
                     to_sig = &self.secured;
@@ -384,13 +403,18 @@ impl CoseMessage {
         };
         match agent {
             Some(v) => {
+                if !self.agents[v].enc {
+                    return Err(JsValue::from(
+                        "Data needs to be secured before counter signatures",
+                    ));
+                }
                 let to_sig = self.agents[v].payload.clone();
                 let ph_bstr = self.agents[v].ph_bstr.clone();
                 self.agents[v].header.counters[counter].get_to_sign(&to_sig, &aead, &ph_bstr)
             }
             None => {
                 let to_sig;
-                if (self.context == SIG || self.context == MAC) {
+                if self.context != ENC {
                     to_sig = &self.payload;
                 } else {
                     to_sig = &self.secured;
@@ -418,12 +442,17 @@ impl CoseMessage {
         let counter_to_ver;
         match agent {
             Some(v) => {
+                if !self.agents[v].enc {
+                    return Err(JsValue::from(
+                        "Data needs to be secured before counter signatures",
+                    ));
+                }
                 to_sig = &self.agents[v].payload;
                 ph_bstr = &self.agents[v].ph_bstr;
                 counter_to_ver = &self.agents[v].header.counters[counter];
             }
             None => {
-                if (self.context == SIG || self.context == MAC) {
+                if self.context != ENC {
                     to_sig = &self.payload;
                 } else {
                     to_sig = &self.secured;
@@ -511,10 +540,22 @@ impl CoseMessage {
                 if !algs::ENCRYPT_ALGS.contains(&alg) {
                     Err(JsValue::from("Invalid algorithm"))
                 } else {
+                    let iv = match self.base_iv.clone() {
+                        Some(v) => algs::gen_iv(
+                            self.header
+                                .partial_iv
+                                .as_ref()
+                                .ok_or(JsValue::from("Missing Partial IV"))?,
+                            &v,
+                            &alg,
+                        )?,
+                        None => self.header.iv.clone().ok_or(JsValue::from("Missing IV"))?,
+                    };
+
                     self.secured = cose_struct::gen_cipher(
                         &self.priv_key,
                         &alg,
-                        self.header.iv.as_ref().ok_or(JsValue::from("Missing IV"))?,
+                        &iv,
                         &aead,
                         cose_struct::ENCRYPT0,
                         &self.ph_bstr,
@@ -551,6 +592,7 @@ impl CoseMessage {
                         return Err(JsValue::from("Key op not supported"));
                     } else {
                         self.agents[i].sign(&self.payload, &aead, &self.ph_bstr)?;
+                        self.agents[i].enc = true;
                     }
                 }
                 Ok(())
@@ -577,9 +619,11 @@ impl CoseMessage {
                                 &alg,
                                 self.header.iv.as_ref().ok_or(JsValue::from("Missing IV"))?,
                             )?;
+                            self.agents[0].enc = true;
                             return Ok(());
                         } else {
                             self.agents[0].mac(&self.payload, &aead, &self.ph_bstr)?;
+                            self.agents[0].enc = true;
                             return Ok(());
                         }
                     }
@@ -595,6 +639,7 @@ impl CoseMessage {
                     }
                     let size = algs::get_cek_size(&alg)?;
                     cek = self.agents[0].derive_key(&Vec::new(), size, true, &alg)?;
+                    self.agents[0].enc = true;
                 } else {
                     cek = algs::gen_random_key(&alg)?;
                     for i in 0..self.agents.len() {
@@ -604,13 +649,26 @@ impl CoseMessage {
                             return Err(JsValue::from("Only one recipient allowed for algorithm"));
                         }
                         cek = self.agents[i].derive_key(&cek, cek.len(), true, &alg)?;
+                        self.agents[i].enc = true;
                     }
                 }
                 if self.context == ENC {
+                    let iv = match self.agents[0].base_iv.clone() {
+                        Some(v) => algs::gen_iv(
+                            self.header
+                                .partial_iv
+                                .as_ref()
+                                .ok_or(JsValue::from("Missing Partial IV"))?,
+                            &v,
+                            &alg,
+                        )?,
+                        None => self.header.iv.clone().ok_or(JsValue::from("Missing IV"))?,
+                    };
+
                     self.secured = cose_struct::gen_cipher(
                         &cek,
                         &alg,
-                        self.header.iv.as_ref().ok_or(JsValue::from("Missing IV"))?,
+                        &iv,
                         &aead,
                         cose_struct::ENCRYPT,
                         &self.ph_bstr,
@@ -812,6 +870,7 @@ impl CoseMessage {
                             },
                         }
                         agent.decode(&mut d)?;
+                        agent.enc = true;
                         self.agents.push(agent);
                     }
                 } else {
@@ -891,10 +950,22 @@ impl CoseMessage {
                         Ok(self.payload.clone())
                     }
                 } else {
+                    let iv = match self.base_iv.clone() {
+                        Some(v) => algs::gen_iv(
+                            self.header
+                                .partial_iv
+                                .as_ref()
+                                .ok_or(JsValue::from("Missing Partial IV"))?,
+                            &v,
+                            &self.header.alg.ok_or(JsValue::from("Missing algorithm"))?,
+                        )?,
+                        None => self.header.iv.clone().ok_or(JsValue::from("Missing IV"))?,
+                    };
+
                     Ok(cose_struct::dec_cipher(
                         &self.priv_key,
                         &self.header.alg.ok_or(JsValue::from("Missing algorithm"))?,
-                        self.header.iv.as_ref().ok_or(JsValue::from("Missing IV"))?,
+                        &iv,
                         &aead,
                         cose_struct::ENCRYPT0,
                         &self.ph_bstr,
@@ -906,7 +977,7 @@ impl CoseMessage {
             let index = agent.ok_or(JsValue::from("Missing Agent"))?;
             if self.context == SIG {
                 if self.agents[index].pub_key.len() == 0
-                    && !self.agents[index].key_ops.contains(&keys::KEY_OPS_VERIFY)
+                    || !self.agents[index].key_ops.contains(&keys::KEY_OPS_VERIFY)
                 {
                     Err(JsValue::from("Key Op not supported"))
                 } else {
@@ -940,10 +1011,22 @@ impl CoseMessage {
                     cek = self.agents[index].derive_key(&payload, size, false, &alg)?;
                 }
                 if self.context == ENC {
+                    let iv = match self.agents[index].base_iv.clone() {
+                        Some(v) => algs::gen_iv(
+                            self.header
+                                .partial_iv
+                                .as_ref()
+                                .ok_or(JsValue::from("Missing Partial IV"))?,
+                            &v,
+                            &alg,
+                        )?,
+                        None => self.header.iv.clone().ok_or(JsValue::from("Missing IV"))?,
+                    };
+
                     Ok(cose_struct::dec_cipher(
                         &cek,
                         &alg,
-                        self.header.iv.as_ref().ok_or(JsValue::from("Missing IV"))?,
+                        &iv,
                         &aead,
                         cose_struct::ENCRYPT,
                         &self.ph_bstr,

@@ -97,6 +97,8 @@ pub struct CoseHeader {
     pub(crate) party_v_identity: Option<Vec<u8>>,
     pub(crate) party_v_nonce: Option<Vec<u8>>,
     pub(crate) party_v_other: Option<Vec<u8>>,
+    pub(crate) pub_other: Option<Vec<u8>>,
+    pub(crate) priv_info: Option<Vec<u8>>,
     pub(crate) ecdh_key: keys::CoseKey,
     pub(crate) static_kid: Option<Vec<u8>>,
     pub(crate) labels_found: Vec<i32>,
@@ -124,11 +126,19 @@ impl CoseHeader {
             party_v_nonce: None,
             party_u_other: None,
             party_v_other: None,
+            pub_other: None,
+            priv_info: None,
             static_kid: None,
             ecdh_key: keys::CoseKey::new(),
         }
     }
 
+    pub fn pub_other(&mut self, other: Vec<u8>) {
+        self.pub_other = Some(other);
+    }
+    pub fn priv_info(&mut self, info: Vec<u8>) {
+        self.priv_info = Some(info);
+    }
     #[wasm_bindgen(getter)]
     pub fn protected(&self) -> Vec<i32> {
         self.protected.clone()

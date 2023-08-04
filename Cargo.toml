@@ -1,6 +1,6 @@
 [package]
 name = "cose-w"
-version = "0.1.4"
+version = "0.1.5"
 authors = ["Tiago Ramires"]
 license = "MIT"
 description = "COSE WebAssembly"
@@ -39,3 +39,4 @@ aes-gcm = "0.10.1"
 ccm = "0.5.0"
 rsa = "0.9.2"
 rand = "0.8.5"
+sha1 = "0.10.5"

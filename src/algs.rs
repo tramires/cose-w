@@ -6,6 +6,7 @@ use cbc_mac::{CbcMac, Mac};
 use getrandom::getrandom;
 use hkdf::Hkdf;
 use hmac::Hmac;
+use sha1::Sha1;
 use sha2::{Sha256, Sha384, Sha512};
 use wasm_bindgen::prelude::*;
 
@@ -111,6 +112,9 @@ pub(crate) const DIRECT_HKDF_AES_256: i32 = -13;
 pub(crate) const A128KW: i32 = -3;
 pub(crate) const A192KW: i32 = -4;
 pub(crate) const A256KW: i32 = -5;
+pub(crate) const RSA_OAEP_1: i32 = -40;
+pub(crate) const RSA_OAEP_256: i32 = -41;
+pub(crate) const RSA_OAEP_512: i32 = -42;
 pub(crate) const ECDH_ES_HKDF_256: i32 = -25;
 pub(crate) const ECDH_ES_HKDF_512: i32 = -26;
 pub(crate) const ECDH_SS_HKDF_256: i32 = -27;
@@ -121,7 +125,7 @@ pub(crate) const ECDH_ES_A256KW: i32 = -31;
 pub(crate) const ECDH_SS_A128KW: i32 = -32;
 pub(crate) const ECDH_SS_A192KW: i32 = -33;
 pub(crate) const ECDH_SS_A256KW: i32 = -34;
-pub(crate) const KEY_DISTRIBUTION_ALGS: [i32; 18] = [
+pub(crate) const KEY_DISTRIBUTION_ALGS: [i32; 21] = [
     DIRECT,
     DIRECT_HKDF_SHA_256,
     DIRECT_HKDF_SHA_512,
@@ -130,6 +134,9 @@ pub(crate) const KEY_DISTRIBUTION_ALGS: [i32; 18] = [
     A128KW,
     A192KW,
     A256KW,
+    RSA_OAEP_1,
+    RSA_OAEP_256,
+    RSA_OAEP_512,
     ECDH_ES_HKDF_256,
     ECDH_ES_HKDF_512,
     ECDH_SS_HKDF_256,
@@ -141,7 +148,7 @@ pub(crate) const KEY_DISTRIBUTION_ALGS: [i32; 18] = [
     ECDH_SS_A192KW,
     ECDH_SS_A256KW,
 ];
-pub(crate) const KEY_DISTRIBUTION_NAMES: [&str; 18] = [
+pub(crate) const KEY_DISTRIBUTION_NAMES: [&str; 21] = [
     "direct",
     "direct+HKDF-SHA-256",
     "direct+HKDF-SHA-512",
@@ -150,6 +157,9 @@ pub(crate) const KEY_DISTRIBUTION_NAMES: [&str; 18] = [
     "A128KW",
     "A192KW",
     "A256KW",
+    "RSAES-OAEP w/ RFC 8017 default parameters",
+    "RSAES-OAEP w/ SHA-256",
+    "RSAES-OAEP w/ SHA-512",
     "ECDH-ES + HKDF-256",
     "ECDH-ES + HKDF-512",
     "ECDH-SS + HKDF-256",
@@ -240,6 +250,7 @@ pub(crate) const SYMMETRIC_ALGS: [i32; 28] = [
     A192KW,
     A256KW,
 ];
+pub(crate) const RSA_OAEP: [i32; 3] = [RSA_OAEP_1, RSA_OAEP_256, RSA_OAEP_512];
 pub(crate) const A_KW: [i32; 3] = [A128KW, A192KW, A256KW];
 pub(crate) const D_HA: [i32; 2] = [DIRECT_HKDF_AES_128, DIRECT_HKDF_AES_256];
 pub(crate) const D_HS: [i32; 2] = [DIRECT_HKDF_SHA_256, DIRECT_HKDF_SHA_512];
@@ -827,7 +838,6 @@ pub(crate) fn decrypt(
             aead::{AeadInPlace, KeyInit},
             Aes128Gcm, Nonce,
         };
-
         let cipher = match Aes128Gcm::new_from_slice(&key) {
             Ok(v) => v,
             Err(_) => return Err(JsValue::from("Invalid AES-GCM Key")),
@@ -1081,6 +1091,64 @@ pub(crate) fn aes_key_unwrap(key: &Vec<u8>, alg: i32, cek: &Vec<u8>) -> Result<V
         return Err(JsValue::from("Invalid KEK size"));
     }
 }
+pub(crate) fn rsa_oaep_enc(
+    key: &Vec<u8>,
+    size: usize,
+    cek: &Vec<u8>,
+    alg: &i32,
+) -> Result<Vec<u8>, JsValue> {
+    use rsa::pkcs1::DecodeRsaPublicKey;
+    use rsa::{Oaep, RsaPrivateKey, RsaPublicKey};
+    let rsa_key = RsaPublicKey::from_pkcs1_der(key).unwrap();
+    if *alg == RSA_OAEP_1 {
+        let padding = Oaep::new::<Sha1>();
+        let mut rng = rand::thread_rng();
+
+        let out = rsa_key.encrypt(&mut rng, padding, &cek).unwrap();
+        Ok(out[..size].to_vec())
+    } else if *alg == RSA_OAEP_256 {
+        let padding = Oaep::new::<Sha256>();
+        let mut rng = rand::thread_rng();
+
+        let out = rsa_key.encrypt(&mut rng, padding, &cek).unwrap();
+        Ok(out[..size].to_vec())
+    } else if *alg == RSA_OAEP_512 {
+        let padding = Oaep::new::<Sha512>();
+        let mut rng = rand::thread_rng();
+
+        let out = rsa_key.encrypt(&mut rng, padding, &cek).unwrap();
+        Ok(out[..size].to_vec())
+    } else {
+        return Err(JsValue::from("Invalid alg"));
+    }
+}
+
+pub(crate) fn rsa_oaep_dec(
+    key: &Vec<u8>,
+    size: usize,
+    cek: &Vec<u8>,
+    alg: &i32,
+) -> Result<Vec<u8>, JsValue> {
+    use rsa::pkcs1::DecodeRsaPrivateKey;
+    use rsa::pkcs8::DecodePrivateKey;
+    use rsa::{Oaep, RsaPrivateKey};
+    let rsa_key = RsaPrivateKey::from_pkcs1_der(key).unwrap();
+    if *alg == RSA_OAEP_1 {
+        let padding = Oaep::new::<Sha1>();
+        let out = rsa_key.decrypt(padding, &cek).unwrap();
+        Ok(out[..size].to_vec())
+    } else if *alg == RSA_OAEP_256 {
+        let padding = Oaep::new::<Sha256>();
+        let out = rsa_key.decrypt(padding, &cek).unwrap();
+        Ok(out[..size].to_vec())
+    } else if *alg == RSA_OAEP_512 {
+        let padding = Oaep::new::<Sha512>();
+        let out = rsa_key.decrypt(padding, &cek).unwrap();
+        Ok(out[..size].to_vec())
+    } else {
+        return Err(JsValue::from("Invalid alg"));
+    }
+}
 
 pub(crate) fn ecdh_derive_key(
     crv_rec: i32,
@@ -1090,6 +1158,8 @@ pub(crate) fn ecdh_derive_key(
 ) -> Result<Vec<u8>, JsValue> {
     if crv_rec != crv_send {
         return Err("Elliptic Curves don't match".into());
+    } else if [keys::X448, keys::X25519].contains(&crv_send) {
+        return Err("X448 and X25519 Not implemented".into());
     } else if crv_send == keys::P_256 {
         use p256::{ecdh, PublicKey, SecretKey};
         return Ok(ecdh::diffie_hellman(
@@ -1134,6 +1204,46 @@ pub(crate) fn hkdf(
     info_input: &mut Vec<u8>,
     alg: i32,
 ) -> Result<Vec<u8>, JsValue> {
+    if [DIRECT_HKDF_AES_128, DIRECT_HKDF_AES_256].contains(&alg) {
+        let mut t = Vec::new();
+        let mut okm = Vec::new();
+        let mut i = 0;
+        while okm.len() < length {
+            i += 1;
+            let mut info_tmp = info_input.clone();
+            t.append(&mut info_tmp);
+            t.append(&mut vec![i]);
+            let mut padded: Vec<u8> = t.clone();
+            if padded.len() % 16 != 0 {
+                padded.append(&mut vec![0; 16 - (padded.len() % 16)]);
+            }
+            if alg == DIRECT_HKDF_AES_128 {
+                let mut mac = match Daa128::new_from_slice(&ikm) {
+                    Ok(v) => v,
+                    Err(_) => return Err(JsValue::from("Invalid MAC")),
+                };
+                mac.update(&padded);
+                let mut s = mac.finalize().into_bytes().to_vec();
+                t = s.clone();
+                t.truncate(16);
+                let mut temp = t.clone();
+                okm.append(&mut temp);
+            } else {
+                let mut mac = match Daa256::new_from_slice(&ikm) {
+                    Ok(v) => v,
+                    Err(_) => return Err(JsValue::from("Invalid MAC")),
+                };
+                mac.update(&padded);
+                let mut s = mac.finalize().into_bytes().to_vec();
+                t = s.clone();
+                t.truncate(16);
+                let mut temp = t.clone();
+                okm.append(&mut temp);
+            }
+        }
+        return Ok(okm[..length].to_vec());
+    }
+
     let salt = match salt_input {
         Some(v) => Some(v.as_slice()),
         None => None,
@@ -1212,12 +1322,48 @@ pub(crate) fn gen_random_key(alg: &i32) -> Result<Vec<u8>, JsValue> {
     }
 }
 
-pub(crate) fn gen_iv(partial_iv: &mut Vec<u8>, base_iv: &Vec<u8>) -> Vec<u8> {
-    let mut left_padded = vec![0; base_iv.len() - partial_iv.len()];
-    left_padded.append(partial_iv);
-    let mut iv = Vec::new();
-    for i in 0..left_padded.len() {
-        iv.push(left_padded[i] ^ base_iv[i]);
+pub(crate) fn get_iv_size(alg: &i32) -> Result<usize, JsValue> {
+    if [A128GCM, A192GCM, A256GCM, CHACHA20].contains(alg) {
+        Ok(12)
+    } else if [
+        AES_CCM_16_64_128,
+        AES_CCM_16_64_256,
+        AES_CCM_16_128_256,
+        AES_CCM_16_128_256,
+    ]
+    .contains(alg)
+    {
+        Ok(13)
+    } else if [
+        AES_CCM_64_64_128,
+        AES_CCM_64_64_256,
+        AES_CCM_64_128_256,
+        AES_CCM_64_128_256,
+    ]
+    .contains(alg)
+    {
+        Ok(7)
+    } else {
+        Err(JsValue::from("Invalid Algorithm"))
     }
-    iv
+}
+
+pub(crate) fn gen_iv(
+    partial_iv: &Vec<u8>,
+    base_iv: &Vec<u8>,
+    alg: &i32,
+) -> Result<Vec<u8>, JsValue> {
+    let size = get_iv_size(alg)?;
+    let mut pv = partial_iv.clone();
+    let mut padded = vec![0; size - pv.len()];
+    padded.append(&mut pv);
+    let mut iv = Vec::new();
+    for i in 0..padded.len() {
+        if i < base_iv.len() {
+            iv.push(padded[i] ^ base_iv[i]);
+        } else {
+            iv.push(padded[i]);
+        }
+    }
+    Ok(iv)
 }

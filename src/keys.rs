@@ -320,7 +320,7 @@ impl CoseKey {
         }
         let crv = self.crv.ok_or(JsValue::from("MissingCRV"))?;
 
-        if kty == OKP && (crv == ED25519 || crv == ED448) {
+        if kty == OKP && [ED25519, ED448, X25519, X448].contains(&crv) {
             Ok(())
         } else if kty == EC2 && EC2_CRVS.contains(&crv) {
             Ok(())
@@ -651,23 +651,17 @@ impl CoseKey {
             }
             Ok(d)
         } else if kty == RSA {
-            let other = match self.other.clone() {
-                Some(v) => {
-                    let mut temp = Vec::new();
-                    for i in 0..v.len() {
-                        temp.push(BigUint::from_bytes_be(&v[i]));
-                    }
-                    temp
-                }
-                None => Vec::new(),
-            };
+            use rsa::pkcs1::EncodeRsaPrivateKey;
             match RsaPrivateKey::from_components(
                 BigUint::from_bytes_be(self.n.as_ref().ok_or(JsValue::from("Missing N"))?),
                 BigUint::from_bytes_be(self.e.as_ref().ok_or(JsValue::from("Missing N"))?),
-                BigUint::from_bytes_be(self.d.as_ref().ok_or(JsValue::from("Missing N"))?),
-                other,
+                BigUint::from_bytes_be(self.rsa_d.as_ref().ok_or(JsValue::from("Missing N"))?),
+                vec![
+                    BigUint::from_bytes_be(self.p.as_ref().ok_or(JsValue::from("Missing N"))?),
+                    BigUint::from_bytes_be(self.q.as_ref().ok_or(JsValue::from("Missing N"))?),
+                ],
             ) {
-                Ok(v) => match v.to_pkcs8_der() {
+                Ok(v) => match v.to_pkcs1_der() {
                     Ok(v2) => {
                         return Ok(v2.to_bytes().to_vec());
                     }
