@@ -1,12 +1,16 @@
 # COSE keys documentation
 
 ## Getters
-- `bytes`: final encoded message.
+
+| Name | Type | Getter | Setter | Description |
+| ---- | ---- | ------ | ------ | ----------- |
+| `bytes` | Uint8Array | Yes | Yes | Final encdoed COSE key set. |
 
 ## Methods 
 
-- `set_bytes(bytes: Vec<u8>)`: Set the COSE key bytes to decode.
-- `add_key(key: Cosekey)`: Add COSE key to key set. 
-- `encode()`: Encode COSE key set. 
-- `decode()`: Decode COSE key set. 
-- `get_key(kid: Vec<u8>)`: Get COSE key from key set with the respective KID. 
+| Name | Parameters | Returns | Description |
+| ---- | ---------- | ------- | ----------- |
+| `decode()` | --- | --- | Decodes the COSE Key. | 
+| `add_key(key: CoseKey)` | `key`: COSE key. | --- | Adds a COSE Key to the COSE key set. | 
+| `encode()` | --- | --- | Encodes the COSE Key. | 
+| `get_key(kid: Uint8Array)` | `kid`: COSE key ID. | number[] | Returns an array of the positions of COSE keys in the COSE key set with the provided Key ID. |
