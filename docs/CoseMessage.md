@@ -1,55 +1,70 @@
-# CoseSign documentation
+# CoseMessage documentation
 
-Module to encode/decode cose-sign1 and cose-sign messages.
+Module to encode/decode COSE messages.
 
-## Getters
 
-- `header`: CoseHeader of the message.
-- `bytes`: Final encoded message.
-- `payload`: Payload of the message.
-- `counters_len`: Number of counter signers.
+## Constructors:
+
+| Name |  Description |
+| ---- | ----------- |
+| `new_sign` | Initiates a COSE sign message type (cose-sign1 and cose-sign). | 
+| `new_encrypt` | Initiates a COSE encrypt message type (cose-encrypt0 and cose-encrypt). | 
+| `new_mac` | Initiates a COSE mac message type (cose-mac0 and cose-mac). | 
+
+## Properties
+
+| Name | Type | Getter | Setter | Description |
+| ---- | ---- | ------ | ------ | ----------- |
+| `header` | [CoseHeader](CoseHeader.md) | Yes | Yes | COSE header object of the message. | 
+| `bytes` | `Uint8Array` | Yes | Yes | Final encoded message in bytes. | 
+| `payload` | `Uint8Array` | Yes | Yes | Payload of the message in bytes. | 
+
 
 When decoding a COSE message, after the function `init_decoding`, all the COSE message parameters will be accessible by the previously listed getters.
 
-## Constructors:
-- `new_sign()`: Creates a COSE sign message type instance (cose-sign1 and cose-sign),
-- `new_encrypt()`: Creates a COSE encrypt message type instance (cose-encrypt0 and cose-encrypt),
-- `new_mac()`: Creates a COSE MAC message type instance (cose-mac0 and cose-mac),
-
 ## Methods 
 
+| Name | Parameters | Returns | Description |
+| ---- | ---------- | ------- | ----------- |
+| `key(key: CoseKey)` | `key`: COSE key. | --- | Sets the COSE key to be used (Method to be only used when COSE message type is cose-sign1, cose-mac0 or cose-encrypt0). | 
+| `secure_content(external_aad?: Uint8Array)` | `external_aad`: Optional external AAD. | --- | Generate the MAC, ciphertext or signature depending on the type of COSE message. | 
+| `encode(payload: bool)` | `payload`: Boolean to determine if the payload is to be included in the COSE message or not. | Uint8Array | Encodes the final COSE message returning it as bytes. | 
+| `init_decoder(payload?: Uint8Array)` | `payload`: Payload of the COSE message in case the payload is not included in the COSE message itself. | --- | Initial decoding of the COSE message in order to access the message attributes to further validate/decode the COSE message. | 
+| `decode(external_aad?: Uint8Array, agent?: number)` | `external_aad`: Optional external AAD. `agent`: Position of the agent in the agents array that is to be decoded, if the COSE message type is cose-sign1, cose-mac0 or cose-encrypt0 the `agent` parameter must be `null`. | `Uint8Array`| Final decoding of the COSE message/recipient/signer returning the COSE message payload. | 
 
-- `set_bytes(bytes: Vec<u8>)`: Sets the COSE message bytes to decode.
-- `set_header(header: CoseHeader)`: Sets the COSE header.
-- `set_payload(payload: Vec<u8>)`: Sets the payload to be encoded.
-- `key(key: keys::CoseKey)`: Sets key to be used in case of cose-sign1 message.
-- `set_key(key: keys::CoseKey)`: Sets key to be used in case of cose-sign1 message.
-- `gen_signature(external_aad: Option<Vec<u8>>)`: Generate signature with optional external AAD.
-- `encode(payload: bool)`: Encode the final message, payload parameter defines if the payload is to be included in the COSE encoded message.
-- `init_decoder(payload: Option<Vec<u8>>)`: Initial decoding of the COSE message to accesss the message atributes to further validate/decode the message, the parameter payload needs to be provided if its not included in the encoded COSE message.
-- `decode(external_aad: Option<Vec<u8>>, signer: Option<usize>)`: Final decode of the COSE message, with the option to include external AAD. If cose-sign1 type message, the signer parameter can be null, else if cose-sign type, a signer index must be provided and the respective signer key must be set.
 
-### Signers:
+### Recipients/Signers use:
 
-Methods for when using cose-sign message type:
+Methods for COSE messages with signers/recipients bucket.
 
-- `agent_header(i: usize)`: Get the signer header.
-- `add_agent(agent: &mut CoseAgent)`: Add signer to the message.
-- `get_agent(kid: Vec<u8>)`: Get signers with the provided key ID.
-- `pub fn add_agent_key(index: usize, cose_key: CoseKey)`: Adds a COSE key to a signer.
+| Name | Parameters | Returns | Description |
+| ---- | ---------- | ------- | ----------- |
+| `agent_header(i: number)` | `i`: Position of the agent in agents array. | [CoseHeader](CoseHeader.md) | Returns the agent header. | 
+| `add_agent(agent: CoseAgent)` | `agent`: COSE agent to add to the COSE message. | --- | Adds a signer/recipient to the COSE message. | 
+| `get_agent(kid: Uint8Array)` | `kid`: COSE Key ID. | --- | Returns the positions of signers/recipients with the provided Key ID. | 
+| `set_agent_key(agent: number, cose_key: CoseKey)` | `agent`: Position of the agent in the agents array.<br/> `cose_key`: COSE key. | --- | Sets the COSE key of the respective signer/recipient. | 
+| `set_agent_pub_other(agent: number, other: Uint8Array)` | `agent`: Position of the agent in agents array. <br/> `other`: SuppPubInfo `other` value. | --- | Sets the respective signer/recipient other field of SuppPubInfo. | 
+| `set_agent_priv_info(agent: number, info: Uint8Array)` | `agent`: Position of the agent in agents array. <br/> `info`: SuppPrivInfo. | --- | Sets the respective signer/recipient SuppPrivInfo value. | 
+| `set_agent_party_identity(agent: number, id: Uint8Array, u: bool)` | `agent`: Position of the agent in agents array. <br/> `id`: Party Identity value. <br/> `u`: If its Party U or V | --- | Sets the respective signer/recipient Party U or V Identity. | 
+| `set_agent_ecdh_key(agent: number, key: CoseKey)` | `agent`: Position of the agent in agents array. <br/> `key`: ECDH COSE Key. | --- | Sets the respective signer/recipient ECDH COSE Key. | 
+
 
 ### Counter Signers:
 
-Methods for when including counter signatures in the message:
+Methods for COSE messages with counter signatures:
 
-- `counter_header(i: usize)`: Get counter header.
-- `counter(kid: Vec<u8>)`: get array positions of the message counters with respective KID.
-- `add_counter_key(i: usize, key: &keys::CoseKey)`: Adds counter signer COSE key. 
-- `counter_sig(external_aad: Option<Vec<u8>>, counter: &mut CoseAgent)`: Generate Counter Signature.
-- `counters_verify(external_aad: Option<Vec<u8>>, counter: usize)`: Verify Counter Signature.
-- `get_to_sign(external_aad: Option<Vec<u8>>, counter: &mut CoseAgent)`: Get content to sign externaly to the module.
-- `get_to_verify(external_aad: Option<Vec<u8>>, counter: &mut CoseAgent)`:  Get  content to verify externaly to the module.
-- `add_counter_sig(counter: CoseAgent)`: Add counter signature to the COSE message.
+| Name | Parameters | Returns | Description |
+| ---- | ---------- | ------- | ----------- |
+| `counters_len(agent?: number)` | `agent`: agent position in the agents array of the message. | `number` | Returns the number of counter signatures of the COSE message or respective agent if `agent` parameter is not `null`. | 
+| `counter_header(counter: number)` | `counter`: counter signature position in the counter signatures array of the message. | [CoseHeader](CoseHeader.md) | Returns the header of the respective counter signature. | 
+| `counter(kid: Uint8Array)` | `kid`: Key ID to search. | --- | Returns the positions of counter signatures with the provided Key ID. | 
+| `set_counter_key(counter: number, key: CoseKey)` | `counter`: Position of the counter signature in the array. <br/> `key`: COSE key. | --- | Adds a COSE key to the respective counter signer. | 
+| `counter_sig(external_aad?: Uint8Array, counter: CoseAgent)` | `external_aad`: Optional external AAD. <br/> `counter`: Counter signer object to add to the message. | --- | Generates Counter Signature and adds to the COSE message. | 
+| `counters_verify(external_aad?: Uint8Array, counter: number)` | `external_aad`: Optional external AAD. <br/> `counter`: Position of the counter signer in the array. | --- | Verifies a Counter Signature in the COSE message. | 
+| `get_to_sign(external_aad?: Uint8Array, counter: CoseAgent)` | `external_aad`: Optional external AAD. <br/> `counter`: Counter signer object. | --- | Get COSE content to sign externally. | 
+| `get_to_verify(external_aad?: Uint8Array, counter: CoseAgent)` | `external_aad`: Optional external AAD. <br/> `counter`: Counter signer object. | --- | Get COSE content to verify externally. | 
+| `add_counter_sig(counter: CoseAgent` | `counter`: Counter signer object. | --- | Add Counter Signer object to the COSE message. | 
+
 
 # Examples 
 
