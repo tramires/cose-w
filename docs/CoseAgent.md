@@ -2,23 +2,25 @@
 
 Module to build COSE message agents (signers, recipients and counter signers).
 
-## Getters
+## Properties
 
-- `header`: CoseHeader of the CoseAgent.
-- `payload`: Payload of the CoseAgent (ciphertext or signature).
+| Name | Type | Getter | Setter | Description |
+| ---- | ---- | ------ | ------ | ----------- |
+| `header` | [CoseHeader](CoseHeader.md) | Yes | Yes | COSE header object. | 
+| `payload` | `Uint8Array` | Yes | No | Payload of the agent object (ciphertext or signature). |
 
 When decoding a COSE message, after the function `init_decoding`, all the COSE message parameters will be accessible by the previously listed getters.
 
 ## Methods 
 
-- Counter signatures:
-- `new_counter_sig()`: Initiates a CoseAgent with the Counter Signer context.
-- `set_header(header: CoseHeader)`: Sets the COSE header.
-- `key(key: keys::CoseKey)`: Sets the key to be used.
-- `ephemeral_key(key: keys::CoseKey, prot: bool, crit: bool)`: Adds the ephemeral ECDH COSE key to the CoseAgent.
-- `static_key(key: keys::CoseKey, prot: bool, crit: bool)`: Adds the static ECDH COSE key to the CoseAgent.
-- `set_static_kid(kid: Vec<u8>, key: keys::CoseKey, prot: bool, crit: bool)`: Adds the static ECDH COSE key and static key ID to the CoseAgent.
-- `add_signature(signature: Vec<u8>)`: Sets counter signature (Method used when the counter signature is produced out of the COSE message encoding).
+| Name | Parameters | Returns | Description |
+| ---- | ---------- | ------- | ----------- |
+| `key(key: CoseKey)` | `key`: COSE key. | --- |  Sets the COSE key to be used. | 
+| `ephemeral_key(key: CoseKey, prot: bool, crit: bool)` | `key`: COSE ephemeral key. <br/> `prot`: If its to be included in protected header. <br/> `crit`: If its to be included in `crit` COSE array. | --- | Sets the COSE ephemeral key for Direct Key Agreement. | 
+| `static_key(key: CoseKey, prot: bool, crit: bool)` | `key`: COSE static key. <br/> `prot`: If to be included in protected header. <br/> `crit`: If its to be included in `crit` COSE array. | --- | Sets the COSE static key for Direct Key Agreement. | 
+| `static_kid(kid: Uint8Array, key: CoseKey, prot: bool, crit: bool)` | `kid`: Static Key ID. <br/> `key`: COSE static key. <br/> `prot`: If to be included in protected header. <br/> `crit`: If its to be included in `crit` COSE array. | --- | Sets the COSE static key for Direct Key Agreement, including only the Key ID on the final COSE message. | 
+| `add_signature(signature: Uint8Array)` | `signature`: COSE signature. | --- | Sets the Counter Signature (Method to be used when the counter signature is produced externally. | 
+
 
 # Examples
 
