@@ -1,4 +1,4 @@
-# COSE keys documentation
+# COSE key set documentation
 
 ## Getters
 
