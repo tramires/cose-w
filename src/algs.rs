@@ -31,8 +31,6 @@ pub(crate) const SIGNING_ALGS_NAMES: [&str; 8] = [
 ];
 
 pub(crate) const SHA_256: i32 = -16;
-pub(crate) const HASH_ALGS: [i32; 1] = [SHA_256];
-pub(crate) const HASH_ALGS_NAMES: [&str; 1] = ["SHA-256"];
 
 pub(crate) const A128GCM: i32 = 1;
 pub(crate) const A192GCM: i32 = 2;
@@ -214,42 +212,8 @@ const K32_ALGS: [i32; 12] = [
 ];
 
 const DER_S2: [u8; 16] = [48, 46, 2, 1, 0, 48, 5, 6, 3, 43, 101, 112, 4, 34, 4, 32];
-const DER_S4: [u8; 16] = [48, 71, 2, 1, 0, 48, 5, 6, 3, 43, 101, 113, 4, 59, 4, 57];
 const DER_P2: [u8; 12] = [48, 42, 48, 5, 6, 3, 43, 101, 112, 3, 33, 0];
-const DER_P4: [u8; 12] = [48, 67, 48, 5, 6, 3, 43, 101, 113, 3, 58, 0];
 
-pub(crate) const OKP_ALGS: [i32; 1] = [EDDSA];
-pub(crate) const EC2_ALGS: [i32; 3] = [ES256, ES384, ES512];
-pub(crate) const SYMMETRIC_ALGS: [i32; 28] = [
-    A128GCM,
-    A192GCM,
-    A256GCM,
-    CHACHA20,
-    AES_CCM_16_64_128,
-    AES_CCM_16_64_256,
-    AES_CCM_64_64_128,
-    AES_CCM_64_64_256,
-    AES_CCM_16_128_128,
-    AES_CCM_16_128_256,
-    AES_CCM_64_128_128,
-    AES_CCM_64_128_256,
-    HMAC_256_64,
-    HMAC_256_256,
-    HMAC_384_384,
-    HMAC_512_512,
-    AES_MAC_128_64,
-    AES_MAC_256_64,
-    AES_MAC_128_128,
-    AES_MAC_256_128,
-    DIRECT,
-    DIRECT_HKDF_SHA_256,
-    DIRECT_HKDF_SHA_512,
-    DIRECT_HKDF_AES_128,
-    DIRECT_HKDF_AES_256,
-    A128KW,
-    A192KW,
-    A256KW,
-];
 pub(crate) const RSA_OAEP: [i32; 3] = [RSA_OAEP_1, RSA_OAEP_256, RSA_OAEP_512];
 pub(crate) const A_KW: [i32; 3] = [A128KW, A192KW, A256KW];
 pub(crate) const D_HA: [i32; 2] = [DIRECT_HKDF_AES_128, DIRECT_HKDF_AES_256];
@@ -1098,7 +1062,7 @@ pub(crate) fn rsa_oaep_enc(
     alg: &i32,
 ) -> Result<Vec<u8>, JsValue> {
     use rsa::pkcs1::DecodeRsaPublicKey;
-    use rsa::{Oaep, RsaPrivateKey, RsaPublicKey};
+    use rsa::{Oaep, RsaPublicKey};
     let rsa_key = RsaPublicKey::from_pkcs1_der(key).unwrap();
     if *alg == RSA_OAEP_1 {
         let padding = Oaep::new::<Sha1>();
@@ -1130,7 +1094,6 @@ pub(crate) fn rsa_oaep_dec(
     alg: &i32,
 ) -> Result<Vec<u8>, JsValue> {
     use rsa::pkcs1::DecodeRsaPrivateKey;
-    use rsa::pkcs8::DecodePrivateKey;
     use rsa::{Oaep, RsaPrivateKey};
     let rsa_key = RsaPrivateKey::from_pkcs1_der(key).unwrap();
     if *alg == RSA_OAEP_1 {
@@ -1223,7 +1186,7 @@ pub(crate) fn hkdf(
                     Err(_) => return Err(JsValue::from("Invalid MAC")),
                 };
                 mac.update(&padded);
-                let mut s = mac.finalize().into_bytes().to_vec();
+                let s = mac.finalize().into_bytes().to_vec();
                 t = s.clone();
                 t.truncate(16);
                 let mut temp = t.clone();
@@ -1234,7 +1197,7 @@ pub(crate) fn hkdf(
                     Err(_) => return Err(JsValue::from("Invalid MAC")),
                 };
                 mac.update(&padded);
-                let mut s = mac.finalize().into_bytes().to_vec();
+                let s = mac.finalize().into_bytes().to_vec();
                 t = s.clone();
                 t.truncate(16);
                 let mut temp = t.clone();

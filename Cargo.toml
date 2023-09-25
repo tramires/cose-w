@@ -1,6 +1,6 @@
 [package]
 name = "cose-w"
-version = "0.1.5"
+version = "0.1.7"
 authors = ["Tiago Ramires"]
 license = "MIT"
 description = "COSE WebAssembly"

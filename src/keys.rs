@@ -1,7 +1,6 @@
 use crate::algs;
 use crate::cbor::{Decoder, Encoder};
 use crate::headers;
-use rsa::pkcs8::EncodePrivateKey;
 use rsa::pkcs8::EncodePublicKey;
 use rsa::{BigUint, RsaPrivateKey, RsaPublicKey};
 use wasm_bindgen::prelude::*;
@@ -160,50 +159,198 @@ impl CoseKey {
     pub fn bytes(&self) -> Vec<u8> {
         self.bytes.clone()
     }
-
+    #[wasm_bindgen(setter)]
+    pub fn set_bytes(&mut self, bytes: Vec<u8>) {
+        self.bytes = bytes;
+    }
     #[wasm_bindgen(getter)]
     pub fn kty(&self) -> Option<i32> {
         self.kty.clone()
+    }
+    #[wasm_bindgen(setter)]
+    pub fn set_kty(&mut self, kty: Option<i32>) {
+        self.reg_label(KTY);
+        self.kty = kty;
     }
     #[wasm_bindgen(getter)]
     pub fn base_iv(&self) -> Option<Vec<u8>> {
         self.base_iv.clone()
     }
+    #[wasm_bindgen(setter)]
+    pub fn set_base_iv(&mut self, base_iv: Option<Vec<u8>>) {
+        self.reg_label(BASE_IV);
+        self.base_iv = base_iv;
+    }
     #[wasm_bindgen(getter)]
     pub fn key_ops(&self) -> Vec<i32> {
         self.key_ops.clone()
+    }
+    #[wasm_bindgen(setter)]
+    pub fn set_key_ops(&mut self, key_ops: Vec<i32>) {
+        self.reg_label(KEY_OPS);
+        self.key_ops = key_ops;
     }
     #[wasm_bindgen(getter)]
     pub fn alg(&self) -> Option<i32> {
         self.alg.clone()
     }
+    #[wasm_bindgen(setter)]
+    pub fn set_alg(&mut self, alg: Option<i32>) {
+        self.reg_label(ALG);
+        self.alg = alg;
+    }
     #[wasm_bindgen(getter)]
     pub fn x(&self) -> Option<Vec<u8>> {
         self.x.clone()
+    }
+    #[wasm_bindgen(setter)]
+    pub fn set_x(&mut self, x: Option<Vec<u8>>) {
+        self.reg_label(X);
+        self.x = x;
     }
     #[wasm_bindgen(getter)]
     pub fn y(&self) -> Option<Vec<u8>> {
         self.y.clone()
     }
+    #[wasm_bindgen(setter)]
+    pub fn set_y(&mut self, y: Option<Vec<u8>>) {
+        self.reg_label(Y);
+        self.y = y;
+    }
     #[wasm_bindgen(getter)]
     pub fn d(&self) -> Option<Vec<u8>> {
         self.d.clone()
+    }
+    #[wasm_bindgen(setter)]
+    pub fn set_d(&mut self, d: Option<Vec<u8>>) {
+        self.reg_label(D);
+        self.d = d;
     }
     #[wasm_bindgen(getter)]
     pub fn k(&self) -> Option<Vec<u8>> {
         self.k.clone()
     }
+    #[wasm_bindgen(setter)]
+    pub fn set_k(&mut self, k: Option<Vec<u8>>) {
+        self.reg_label(CRV_K);
+        self.k = k;
+    }
     #[wasm_bindgen(getter)]
     pub fn kid(&self) -> Option<Vec<u8>> {
         self.kid.clone()
+    }
+    #[wasm_bindgen(setter)]
+    pub fn set_kid(&mut self, kid: Option<Vec<u8>>) {
+        self.reg_label(KID);
+        self.kid = kid;
     }
     #[wasm_bindgen(getter)]
     pub fn crv(&self) -> Option<i32> {
         self.crv.clone()
     }
-
-    pub fn set_bytes(&mut self, bytes: Vec<u8>) {
-        self.bytes = bytes;
+    #[wasm_bindgen(setter)]
+    pub fn set_crv(&mut self, crv: Option<i32>) {
+        self.reg_label(CRV_K);
+        self.crv = crv;
+    }
+    #[wasm_bindgen(getter)]
+    pub fn n(&self) -> Option<Vec<u8>> {
+        self.n.clone()
+    }
+    #[wasm_bindgen(setter)]
+    pub fn set_n(&mut self, n: Option<Vec<u8>>) {
+        self.reg_label(N);
+        self.n = n;
+    }
+    #[wasm_bindgen(getter)]
+    pub fn e(&self) -> Option<Vec<u8>> {
+        self.e.clone()
+    }
+    #[wasm_bindgen(setter)]
+    pub fn set_e(&mut self, e: Option<Vec<u8>>) {
+        self.reg_label(E);
+        self.e = e;
+    }
+    #[wasm_bindgen(getter)]
+    pub fn rsa_d(&self) -> Option<Vec<u8>> {
+        self.rsa_d.clone()
+    }
+    #[wasm_bindgen(setter)]
+    pub fn set_rsa_d(&mut self, rsa_d: Option<Vec<u8>>) {
+        self.reg_label(RSA_D);
+        self.rsa_d = rsa_d;
+    }
+    #[wasm_bindgen(getter)]
+    pub fn p(&self) -> Option<Vec<u8>> {
+        self.p.clone()
+    }
+    #[wasm_bindgen(setter)]
+    pub fn set_p(&mut self, p: Option<Vec<u8>>) {
+        self.reg_label(P);
+        self.p = p;
+    }
+    #[wasm_bindgen(getter)]
+    pub fn q(&self) -> Option<Vec<u8>> {
+        self.q.clone()
+    }
+    #[wasm_bindgen(setter)]
+    pub fn set_q(&mut self, q: Option<Vec<u8>>) {
+        self.reg_label(Q);
+        self.q = q;
+    }
+    #[wasm_bindgen(getter)]
+    pub fn dp(&self) -> Option<Vec<u8>> {
+        self.dp.clone()
+    }
+    #[wasm_bindgen(setter)]
+    pub fn set_dp(&mut self, dp: Option<Vec<u8>>) {
+        self.reg_label(DP);
+        self.dp = dp;
+    }
+    #[wasm_bindgen(getter)]
+    pub fn dq(&self) -> Option<Vec<u8>> {
+        self.dq.clone()
+    }
+    #[wasm_bindgen(setter)]
+    pub fn set_dq(&mut self, dq: Option<Vec<u8>>) {
+        self.reg_label(DQ);
+        self.dq = dq;
+    }
+    #[wasm_bindgen(getter)]
+    pub fn qinv(&self) -> Option<Vec<u8>> {
+        self.qinv.clone()
+    }
+    #[wasm_bindgen(setter)]
+    pub fn set_qinv(&mut self, qinv: Option<Vec<u8>>) {
+        self.reg_label(QINV);
+        self.qinv = qinv;
+    }
+    #[wasm_bindgen(getter)]
+    pub fn ri(&self) -> Option<Vec<u8>> {
+        self.ri.clone()
+    }
+    #[wasm_bindgen(setter)]
+    pub fn set_ri(&mut self, ri: Option<Vec<u8>>) {
+        self.reg_label(RI);
+        self.ri = ri;
+    }
+    #[wasm_bindgen(getter)]
+    pub fn di(&self) -> Option<Vec<u8>> {
+        self.di.clone()
+    }
+    #[wasm_bindgen(setter)]
+    pub fn set_di(&mut self, di: Option<Vec<u8>>) {
+        self.reg_label(DI);
+        self.di = di;
+    }
+    #[wasm_bindgen(getter)]
+    pub fn ti(&self) -> Option<Vec<u8>> {
+        self.ti.clone()
+    }
+    #[wasm_bindgen(setter)]
+    pub fn set_ti(&mut self, ti: Option<Vec<u8>>) {
+        self.reg_label(TI);
+        self.ti = ti;
     }
 
     fn reg_label(&mut self, label: i32) {
@@ -213,104 +360,6 @@ impl CoseKey {
 
     pub(crate) fn remove_label(&mut self, label: i32) {
         self.used.retain(|&x| x != label);
-    }
-
-    pub fn set_kty(&mut self, kty: i32) {
-        self.reg_label(KTY);
-        self.kty = Some(kty);
-    }
-
-    pub fn set_kid(&mut self, kid: Vec<u8>) {
-        self.reg_label(KID);
-        self.kid = Some(kid);
-    }
-
-    pub fn set_alg(&mut self, alg: i32) {
-        self.reg_label(ALG);
-        self.alg = Some(alg);
-    }
-
-    pub fn set_key_ops(&mut self, key_ops: Vec<i32>) {
-        self.reg_label(KEY_OPS);
-        self.key_ops = key_ops;
-    }
-
-    pub fn set_base_iv(&mut self, base_iv: Vec<u8>) {
-        self.reg_label(BASE_IV);
-        self.base_iv = Some(base_iv);
-    }
-
-    pub fn set_crv(&mut self, crv: i32) {
-        self.reg_label(CRV_K);
-        self.crv = Some(crv);
-    }
-
-    pub fn set_x(&mut self, x: Vec<u8>) {
-        self.reg_label(X);
-        self.x = Some(x);
-    }
-
-    pub fn set_y(&mut self, y: Vec<u8>) {
-        self.reg_label(Y);
-        self.y = Some(y);
-    }
-
-    pub fn set_d(&mut self, d: Vec<u8>) {
-        self.reg_label(D);
-        self.d = Some(d);
-    }
-
-    pub fn set_k(&mut self, k: Vec<u8>) {
-        self.reg_label(CRV_K);
-        self.k = Some(k);
-    }
-    pub fn set_n(&mut self, n: Vec<u8>) {
-        self.reg_label(N);
-        self.n = Some(n);
-    }
-    pub fn set_e(&mut self, e: Vec<u8>) {
-        self.reg_label(E);
-        self.e = Some(e);
-    }
-    pub fn set_rsa_d(&mut self, rsa_d: Vec<u8>) {
-        self.reg_label(RSA_D);
-        self.rsa_d = Some(rsa_d);
-    }
-    pub fn set_p(&mut self, p: Vec<u8>) {
-        self.reg_label(P);
-        self.p = Some(p);
-    }
-    pub fn set_q(&mut self, q: Vec<u8>) {
-        self.reg_label(Q);
-        self.q = Some(q);
-    }
-    pub fn set_dp(&mut self, dp: Vec<u8>) {
-        self.reg_label(DP);
-        self.dp = Some(dp);
-    }
-    pub fn set_dq(&mut self, dq: Vec<u8>) {
-        self.reg_label(DQ);
-        self.dq = Some(dq);
-    }
-    pub fn set_qinv(&mut self, qinv: Vec<u8>) {
-        self.reg_label(QINV);
-        self.qinv = Some(qinv);
-    }
-    pub fn set_other(&mut self, other: Vec<u8>) {
-        self.reg_label(OTHER);
-        self.other = Some(vec![other]);
-    }
-    pub fn set_ri(&mut self, ri: Vec<u8>) {
-        self.reg_label(RI);
-        self.ri = Some(ri);
-    }
-    pub fn set_di(&mut self, di: Vec<u8>) {
-        self.reg_label(DI);
-        self.di = Some(di);
-    }
-    pub fn set_ti(&mut self, ti: Vec<u8>) {
-        self.reg_label(TI);
-        self.ti = Some(ti);
     }
 
     pub(crate) fn verify_curve(&self) -> Result<(), JsValue> {
@@ -756,6 +805,7 @@ impl CoseKeySet {
         self.bytes.clone()
     }
 
+    #[wasm_bindgen(setter)]
     pub fn set_bytes(&mut self, bytes: Vec<u8>) {
         self.bytes = bytes;
     }

@@ -132,28 +132,13 @@ impl CoseHeader {
             ecdh_key: keys::CoseKey::new(),
         }
     }
-
-    pub fn pub_other(&mut self, other: Vec<u8>) {
-        self.pub_other = Some(other);
-    }
-    pub fn priv_info(&mut self, info: Vec<u8>) {
-        self.priv_info = Some(info);
-    }
-    #[wasm_bindgen(getter)]
-    pub fn protected(&self) -> Vec<i32> {
-        self.protected.clone()
-    }
-    #[wasm_bindgen(getter)]
-    pub fn unprotected(&self) -> Vec<i32> {
-        self.unprotected.clone()
-    }
     #[wasm_bindgen(getter)]
     pub fn alg(&self) -> Option<i32> {
         self.alg.clone()
     }
-    #[wasm_bindgen(getter)]
-    pub fn crit(&self) -> Vec<i32> {
-        self.crit.clone()
+    pub fn set_alg(&mut self, alg: i32, prot: bool, crit: bool) {
+        self.reg_label(ALG, prot, crit);
+        self.alg = Some(alg);
     }
     #[wasm_bindgen(getter)]
     pub fn content_type(&self) -> Option<String> {
@@ -165,106 +150,54 @@ impl CoseHeader {
             ContentTypeTypes::Tstr(v) => Some(v.to_string()),
         }
     }
+    pub fn set_content_type(&mut self, content_type: u32, prot: bool, crit: bool) {
+        self.reg_label(CONTENT_TYPE, prot, crit);
+        self.content_type = Some(ContentTypeTypes::Uint(content_type));
+    }
     #[wasm_bindgen(getter)]
     pub fn kid(&self) -> Option<Vec<u8>> {
         self.kid.clone()
+    }
+    pub fn set_kid(&mut self, kid: Vec<u8>, prot: bool, crit: bool) {
+        self.reg_label(KID, prot, crit);
+        self.kid = Some(kid);
     }
     #[wasm_bindgen(getter)]
     pub fn iv(&self) -> Option<Vec<u8>> {
         self.iv.clone()
     }
-    #[wasm_bindgen(getter)]
-    pub fn partial_iv(&self) -> Option<Vec<u8>> {
-        self.partial_iv.clone()
-    }
-    #[wasm_bindgen(getter)]
-    pub fn salt(&self) -> Option<Vec<u8>> {
-        self.salt.clone()
-    }
-    #[wasm_bindgen(getter)]
-    pub fn party_u_identity(&self) -> Option<Vec<u8>> {
-        self.party_u_identity.clone()
-    }
-    #[wasm_bindgen(getter)]
-    pub fn party_u_nonce(&self) -> Option<Vec<u8>> {
-        self.party_u_nonce.clone()
-    }
-    #[wasm_bindgen(getter)]
-    pub fn party_u_other(&self) -> Option<Vec<u8>> {
-        self.party_u_other.clone()
-    }
-    #[wasm_bindgen(getter)]
-    pub fn party_v_identity(&self) -> Option<Vec<u8>> {
-        self.party_v_identity.clone()
-    }
-    #[wasm_bindgen(getter)]
-    pub fn party_v_nonce(&self) -> Option<Vec<u8>> {
-        self.party_v_nonce.clone()
-    }
-    #[wasm_bindgen(getter)]
-    pub fn party_v_other(&self) -> Option<Vec<u8>> {
-        self.party_v_other.clone()
-    }
-    #[wasm_bindgen(getter)]
-    pub fn ecdh_key(&self) -> keys::CoseKey {
-        self.ecdh_key.clone()
-    }
-    #[wasm_bindgen(getter)]
-    pub fn static_kid(&self) -> Option<Vec<u8>> {
-        self.static_kid.clone()
-    }
-
-    pub(crate) fn remove_label(&mut self, label: i32) {
-        self.unprotected.retain(|&x| x != label);
-        self.protected.retain(|&x| x != label);
-    }
-
-    fn reg_label(&mut self, label: i32, prot: bool, crit: bool) {
-        self.remove_label(label);
-        if prot {
-            self.protected.push(label);
-        } else {
-            self.unprotected.push(label);
-        }
-        if crit && !self.crit.contains(&label) {
-            self.crit.push(ALG);
-        }
-    }
-
-    pub fn set_alg(&mut self, alg: i32, prot: bool, crit: bool) {
-        self.reg_label(ALG, prot, crit);
-        self.alg = Some(alg);
-    }
-
-    pub fn set_kid(&mut self, kid: Vec<u8>, prot: bool, crit: bool) {
-        self.reg_label(KID, prot, crit);
-        self.kid = Some(kid);
-    }
-
     pub fn set_iv(&mut self, iv: Vec<u8>, prot: bool, crit: bool) {
         self.remove_label(PARTIAL_IV);
         self.partial_iv = None;
         self.reg_label(IV, prot, crit);
         self.iv = Some(iv);
     }
-
+    #[wasm_bindgen(getter)]
+    pub fn partial_iv(&self) -> Option<Vec<u8>> {
+        self.partial_iv.clone()
+    }
     pub fn set_partial_iv(&mut self, partial_iv: Vec<u8>, prot: bool, crit: bool) {
         self.remove_label(IV);
         self.iv = None;
         self.reg_label(PARTIAL_IV, prot, crit);
         self.partial_iv = Some(partial_iv);
     }
-
+    #[wasm_bindgen(getter)]
+    pub fn salt(&self) -> Option<Vec<u8>> {
+        self.salt.clone()
+    }
     pub fn set_salt(&mut self, salt: Vec<u8>, prot: bool, crit: bool) {
         self.reg_label(SALT, prot, crit);
         self.salt = Some(salt);
     }
-
-    pub fn set_content_type(&mut self, content_type: u32, prot: bool, crit: bool) {
-        self.reg_label(CONTENT_TYPE, prot, crit);
-        self.content_type = Some(ContentTypeTypes::Uint(content_type));
+    #[wasm_bindgen(getter)]
+    pub fn party_u_identity(&self) -> Option<Vec<u8>> {
+        self.party_u_identity.clone()
     }
-
+    #[wasm_bindgen(getter)]
+    pub fn party_v_identity(&self) -> Option<Vec<u8>> {
+        self.party_v_identity.clone()
+    }
     pub fn set_party_identity(&mut self, identity: Vec<u8>, prot: bool, crit: bool, u: bool) {
         if u {
             self.reg_label(PARTY_U_IDENTITY, prot, crit);
@@ -274,7 +207,14 @@ impl CoseHeader {
             self.party_v_identity = Some(identity);
         }
     }
-
+    #[wasm_bindgen(getter)]
+    pub fn party_u_nonce(&self) -> Option<Vec<u8>> {
+        self.party_u_nonce.clone()
+    }
+    #[wasm_bindgen(getter)]
+    pub fn party_v_nonce(&self) -> Option<Vec<u8>> {
+        self.party_v_nonce.clone()
+    }
     pub fn set_party_nonce(&mut self, nonce: Vec<u8>, prot: bool, crit: bool, u: bool) {
         if u {
             self.reg_label(PARTY_U_NONCE, prot, crit);
@@ -284,7 +224,14 @@ impl CoseHeader {
             self.party_v_nonce = Some(nonce);
         }
     }
-
+    #[wasm_bindgen(getter)]
+    pub fn party_u_other(&self) -> Option<Vec<u8>> {
+        self.party_u_other.clone()
+    }
+    #[wasm_bindgen(getter)]
+    pub fn party_v_other(&self) -> Option<Vec<u8>> {
+        self.party_v_other.clone()
+    }
     pub fn set_party_other(&mut self, other: Vec<u8>, prot: bool, crit: bool, u: bool) {
         if u {
             self.reg_label(PARTY_U_OTHER, prot, crit);
@@ -294,7 +241,25 @@ impl CoseHeader {
             self.party_v_other = Some(other);
         }
     }
-
+    #[wasm_bindgen(getter)]
+    pub fn ecdh_key(&self) -> keys::CoseKey {
+        self.ecdh_key.clone()
+    }
+    #[wasm_bindgen(setter)]
+    pub fn set_ecdh_key(&mut self, key: keys::CoseKey) {
+        self.ecdh_key = key;
+    }
+    #[wasm_bindgen(getter)]
+    pub fn static_kid(&self) -> Option<Vec<u8>> {
+        self.static_kid.clone()
+    }
+    pub fn set_static_kid(&mut self, kid: Vec<u8>, key: keys::CoseKey, prot: bool, crit: bool) {
+        self.remove_label(STATIC_KEY);
+        self.remove_label(EPHEMERAL_KEY);
+        self.reg_label(STATIC_KEY_ID, prot, crit);
+        self.ecdh_key = key;
+        self.static_kid = Some(kid);
+    }
     pub fn ephemeral_key(&mut self, key: keys::CoseKey, prot: bool, crit: bool) {
         self.remove_label(STATIC_KEY_ID);
         self.remove_label(STATIC_KEY);
@@ -311,107 +276,49 @@ impl CoseHeader {
         self.ecdh_key = key;
     }
 
-    pub fn set_static_kid(&mut self, kid: Vec<u8>, key: keys::CoseKey, prot: bool, crit: bool) {
-        self.remove_label(STATIC_KEY);
-        self.remove_label(EPHEMERAL_KEY);
-        self.reg_label(STATIC_KEY_ID, prot, crit);
-        self.ecdh_key = key;
-        self.static_kid = Some(kid);
+    #[wasm_bindgen(getter)]
+    pub fn pub_other(&self) -> Option<Vec<u8>> {
+        self.pub_other.clone()
     }
-
-    pub fn set_ecdh_key(&mut self, key: keys::CoseKey) {
-        self.ecdh_key = key;
+    #[wasm_bindgen(setter)]
+    pub fn set_pub_other(&mut self, other: Option<Vec<u8>>) {
+        self.pub_other = other;
     }
-
-    pub(crate) fn encode_unprotected(&mut self, encoder: &mut Encoder) -> Result<(), JsValue> {
-        encoder.object(self.unprotected.len());
-        for i in 0..self.unprotected.len() {
-            if !self.labels_found.contains(&self.unprotected[i]) {
-                self.labels_found.push(self.unprotected[i]);
-            } else {
-                return Err(JsValue::from(
-                    "Duplicate label ".to_owned() + &self.unprotected[i].to_string(),
-                ));
-            };
-            encoder.signed(self.unprotected[i]);
-            self.encode_label(self.unprotected[i], encoder, false)?;
+    #[wasm_bindgen(getter)]
+    pub fn priv_info(&self) -> Option<Vec<u8>> {
+        self.priv_info.clone()
+    }
+    #[wasm_bindgen(setter)]
+    pub fn set_priv_info(&mut self, info: Option<Vec<u8>>) {
+        self.priv_info = info;
+    }
+    #[wasm_bindgen(getter)]
+    pub fn protected(&self) -> Vec<i32> {
+        self.protected.clone()
+    }
+    #[wasm_bindgen(getter)]
+    pub fn unprotected(&self) -> Vec<i32> {
+        self.unprotected.clone()
+    }
+    #[wasm_bindgen(getter)]
+    pub fn crit(&self) -> Vec<i32> {
+        self.crit.clone()
+    }
+    pub(crate) fn remove_label(&mut self, label: i32) {
+        self.unprotected.retain(|&x| x != label);
+        self.protected.retain(|&x| x != label);
+    }
+    fn reg_label(&mut self, label: i32, prot: bool, crit: bool) {
+        self.remove_label(label);
+        if prot {
+            self.protected.push(label);
+        } else {
+            self.unprotected.push(label);
         }
-        Ok(())
-    }
-
-    pub(crate) fn get_protected_bstr(&mut self, verify_label: bool) -> Result<Vec<u8>, JsValue> {
-        let mut ph_bstr = Vec::new();
-        let mut encoder = Encoder::new();
-        let prot_len = self.protected.len();
-        let crit_len = self.crit.len();
-        if crit_len > 0 || prot_len > 0 {
-            if crit_len > 0 {
-                encoder.object(prot_len + 1);
-                encoder.signed(CRIT);
-                encoder.array(crit_len);
-                for i in &self.crit {
-                    encoder.signed(*i);
-                }
-            } else {
-                encoder.object(prot_len);
-            }
-            for i in 0..self.protected.len() {
-                if verify_label {
-                    if !self.labels_found.contains(&self.protected[i]) {
-                        self.labels_found.push(self.protected[i]);
-                    } else {
-                        return Err(JsValue::from(
-                            "Duplicate label ".to_owned() + &self.protected[i].to_string(),
-                        ));
-                    };
-                }
-                encoder.signed(self.protected[i]);
-                self.encode_label(self.protected[i], &mut encoder, true)?;
-            }
-            ph_bstr = encoder.encoded();
+        if crit && !self.crit.contains(&label) {
+            self.crit.push(ALG);
         }
-        Ok(ph_bstr)
     }
-
-    pub(crate) fn decode_unprotected(
-        &mut self,
-        decoder: &mut Decoder,
-        is_counter_sig: bool,
-    ) -> Result<(), JsValue> {
-        let unprot_len = decoder.object()?;
-        self.unprotected = Vec::new();
-        for _ in 0..unprot_len {
-            let label = decoder.signed()?;
-            if !self.labels_found.contains(&label) {
-                self.labels_found.push(label);
-            } else {
-                return Err(JsValue::from(
-                    "Duplicate label ".to_owned() + &label.to_string(),
-                ));
-            }
-            self.decode_label(label, decoder, false, is_counter_sig)?;
-        }
-        Ok(())
-    }
-
-    pub(crate) fn decode_protected_bstr(&mut self, ph_bstr: Vec<u8>) -> Result<(), JsValue> {
-        let mut decoder = Decoder::new(ph_bstr.clone());
-        let prot_len = decoder.object()?;
-        self.protected = Vec::new();
-        for _ in 0..prot_len {
-            let label = decoder.signed()?;
-            if !self.labels_found.contains(&label) {
-                self.labels_found.push(label);
-            } else {
-                return Err(JsValue::from(
-                    "Duplicate label ".to_owned() + &label.to_string(),
-                ));
-            };
-            self.decode_label(label, &mut decoder, true, false)?;
-        }
-        Ok(())
-    }
-
     fn encode_label(
         &mut self,
         label: i32,
@@ -510,7 +417,6 @@ impl CoseHeader {
         }
         Ok(())
     }
-
     fn decode_label(
         &mut self,
         label: i32,
@@ -628,6 +534,91 @@ impl CoseHeader {
             return Err(JsValue::from(
                 "Invalid label ".to_owned() + &label.to_string(),
             ));
+        }
+        Ok(())
+    }
+    pub(crate) fn encode_unprotected(&mut self, encoder: &mut Encoder) -> Result<(), JsValue> {
+        encoder.object(self.unprotected.len());
+        for i in 0..self.unprotected.len() {
+            if !self.labels_found.contains(&self.unprotected[i]) {
+                self.labels_found.push(self.unprotected[i]);
+            } else {
+                return Err(JsValue::from(
+                    "Duplicate label ".to_owned() + &self.unprotected[i].to_string(),
+                ));
+            };
+            encoder.signed(self.unprotected[i]);
+            self.encode_label(self.unprotected[i], encoder, false)?;
+        }
+        Ok(())
+    }
+    pub(crate) fn get_protected_bstr(&mut self, verify_label: bool) -> Result<Vec<u8>, JsValue> {
+        let mut ph_bstr = Vec::new();
+        let mut encoder = Encoder::new();
+        let prot_len = self.protected.len();
+        let crit_len = self.crit.len();
+        if crit_len > 0 || prot_len > 0 {
+            if crit_len > 0 {
+                encoder.object(prot_len + 1);
+                encoder.signed(CRIT);
+                encoder.array(crit_len);
+                for i in &self.crit {
+                    encoder.signed(*i);
+                }
+            } else {
+                encoder.object(prot_len);
+            }
+            for i in 0..self.protected.len() {
+                if verify_label {
+                    if !self.labels_found.contains(&self.protected[i]) {
+                        self.labels_found.push(self.protected[i]);
+                    } else {
+                        return Err(JsValue::from(
+                            "Duplicate label ".to_owned() + &self.protected[i].to_string(),
+                        ));
+                    };
+                }
+                encoder.signed(self.protected[i]);
+                self.encode_label(self.protected[i], &mut encoder, true)?;
+            }
+            ph_bstr = encoder.encoded();
+        }
+        Ok(ph_bstr)
+    }
+    pub(crate) fn decode_unprotected(
+        &mut self,
+        decoder: &mut Decoder,
+        is_counter_sig: bool,
+    ) -> Result<(), JsValue> {
+        let unprot_len = decoder.object()?;
+        self.unprotected = Vec::new();
+        for _ in 0..unprot_len {
+            let label = decoder.signed()?;
+            if !self.labels_found.contains(&label) {
+                self.labels_found.push(label);
+            } else {
+                return Err(JsValue::from(
+                    "Duplicate label ".to_owned() + &label.to_string(),
+                ));
+            }
+            self.decode_label(label, decoder, false, is_counter_sig)?;
+        }
+        Ok(())
+    }
+    pub(crate) fn decode_protected_bstr(&mut self, ph_bstr: Vec<u8>) -> Result<(), JsValue> {
+        let mut decoder = Decoder::new(ph_bstr.clone());
+        let prot_len = decoder.object()?;
+        self.protected = Vec::new();
+        for _ in 0..prot_len {
+            let label = decoder.signed()?;
+            if !self.labels_found.contains(&label) {
+                self.labels_found.push(label);
+            } else {
+                return Err(JsValue::from(
+                    "Duplicate label ".to_owned() + &label.to_string(),
+                ));
+            };
+            self.decode_label(label, &mut decoder, true, false)?;
         }
         Ok(())
     }

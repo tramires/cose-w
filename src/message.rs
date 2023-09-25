@@ -120,15 +120,26 @@ impl CoseMessage {
     pub fn header(&self) -> CoseHeader {
         self.header.clone()
     }
+    #[wasm_bindgen(setter)]
+    pub fn set_header(&mut self, header: CoseHeader) {
+        self.header = header;
+    }
     #[wasm_bindgen(getter)]
     pub fn bytes(&self) -> Vec<u8> {
         self.bytes.clone()
+    }
+    #[wasm_bindgen(setter)]
+    pub fn set_bytes(&mut self, bytes: Vec<u8>) {
+        self.bytes = bytes;
     }
     #[wasm_bindgen(getter)]
     pub fn payload(&self) -> Vec<u8> {
         self.payload.clone()
     }
-
+    #[wasm_bindgen(setter)]
+    pub fn set_payload(&mut self, payload: Vec<u8>) {
+        self.payload = payload;
+    }
     pub fn counters_len(&self, agent: Option<usize>) -> usize {
         match agent {
             Some(v) => self.agents[v].header.counters.len(),
@@ -136,24 +147,23 @@ impl CoseMessage {
         }
     }
     pub fn set_pub_other(&mut self, agent: usize, other: Vec<u8>) {
-        self.agents[agent].header.pub_other(other);
+        self.agents[agent].header.pub_other = Some(other);
     }
     pub fn set_priv_info(&mut self, agent: usize, info: Vec<u8>) {
-        self.agents[agent].header.priv_info(info);
+        self.agents[agent].header.priv_info = Some(info);
     }
     pub fn set_party_identity(&mut self, agent: usize, id: Vec<u8>, u: bool) {
         self.agents[agent]
             .header
             .set_party_identity(id, false, false, u);
     }
-
     pub fn set_ecdh_key(&mut self, agent: usize, key: keys::CoseKey) {
         self.agents[agent].header.set_ecdh_key(key);
     }
-    pub fn counter_header(&self, i: usize, agent: Option<usize>) -> CoseHeader {
+    pub fn counter_header(&self, counter: usize, agent: Option<usize>) -> CoseHeader {
         match agent {
-            Some(v) => self.agents[v].header.counters[i].header.clone(),
-            None => self.header.counters[i].header.clone(),
+            Some(v) => self.agents[v].header.counters[counter].header.clone(),
+            None => self.header.counters[counter].header.clone(),
         }
     }
     pub fn counter(&mut self, kid: Vec<u8>, agent: Option<usize>) -> Result<Vec<usize>, JsValue> {
@@ -180,42 +190,30 @@ impl CoseMessage {
         self.agents[i].header.clone()
     }
 
-    pub fn add_agent_key(&mut self, index: usize, cose_key: &keys::CoseKey) -> Result<(), JsValue> {
-        if index < self.agents.len() {
-            self.agents[index].key(cose_key)?;
+    pub fn set_agent_key(&mut self, agent: usize, cose_key: &keys::CoseKey) -> Result<(), JsValue> {
+        if agent < self.agents.len() {
+            self.agents[agent].key(cose_key)?;
             Ok(())
         } else {
-            Err(JsValue::from("Invalid index provided"))
+            Err(JsValue::from("Invalid agent index provided"))
         }
     }
-    pub fn add_counter_key(
+    pub fn set_counter_key(
         &mut self,
-        i: usize,
+        counter: usize,
         agent: Option<usize>,
         key: &keys::CoseKey,
     ) -> Result<(), JsValue> {
         match agent {
             Some(v) => {
-                self.agents[v].header.counters[i].key(key)?;
+                self.agents[v].header.counters[counter].key(key)?;
                 Ok(())
             }
             None => {
-                self.header.counters[i].key(key)?;
+                self.header.counters[counter].key(key)?;
                 Ok(())
             }
         }
-    }
-
-    pub fn set_header(&mut self, header: CoseHeader) {
-        self.header = header;
-    }
-
-    pub fn set_payload(&mut self, payload: Vec<u8>) {
-        self.payload = payload;
-    }
-
-    pub fn set_bytes(&mut self, bytes: Vec<u8>) {
-        self.bytes = bytes;
     }
 
     pub fn add_agent(&mut self, agent: &mut CoseAgent) -> Result<(), JsValue> {
