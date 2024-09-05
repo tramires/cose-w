@@ -88,7 +88,7 @@ mod test_vecs {
         let mut key = keys::CoseKey::new();
         key.bytes = ELEVEN.to_vec();
         key.decode().unwrap();
-        key.set_alg(algs::ES256);
+        key.set_alg(Some(algs::ES256));
         verify.agents[v1].key(&key).unwrap();
         verify.decode(None, Some(v1)).unwrap();
     }
@@ -116,7 +116,7 @@ mod test_vecs {
         let mut key = keys::CoseKey::new();
         key.bytes = ELEVEN.to_vec();
         key.decode().unwrap();
-        key.set_alg(algs::ES256);
+        key.set_alg(Some(algs::ES256));
         verify.agents[v1].key(&key).unwrap();
 
         verify.decode(None, Some(v1)).unwrap();
@@ -141,7 +141,7 @@ mod test_vecs {
         let mut key = keys::CoseKey::new();
         key.bytes = ELEVEN.to_vec();
         key.decode().unwrap();
-        key.set_alg(algs::ES256);
+        key.set_alg(Some(algs::ES256));
         verify.key(&key).unwrap();
         verify.decode(None, None).unwrap();
     }
@@ -216,7 +216,7 @@ mod test_vecs {
         let mut key = keys::CoseKey::new();
         key.bytes = OUR_SECRET.to_vec();
         key.decode().unwrap();
-        key.set_alg(algs::AES_MAC_256_64);
+        key.set_alg(Some(algs::AES_MAC_256_64));
         verify.agents[r].key(&key).unwrap();
         verify.decode(None, Some(r)).unwrap();
     }
@@ -270,7 +270,7 @@ mod test_vecs {
         let mut key = keys::CoseKey::new();
         key.bytes = UID.to_vec();
         key.decode().unwrap();
-        key.set_alg(algs::AES_MAC_128_64);
+        key.set_alg(Some(algs::AES_MAC_128_64));
         verify.agents[r].key(&key).unwrap();
 
         verify.decode(None, Some(r)).unwrap();
@@ -287,7 +287,7 @@ mod test_vecs {
         let mut key = keys::CoseKey::new();
         key.bytes = OUR_SECRET.to_vec();
         key.decode().unwrap();
-        key.set_alg(algs::AES_MAC_256_64);
+        key.set_alg(Some(algs::AES_MAC_256_64));
         verify.key(&key).unwrap();
         verify.decode(None, None).unwrap();
     }
@@ -319,9 +319,9 @@ mod test_vecs {
         verify.init_decoder(None).unwrap();
         let v1 = verify.get_agent(kid).unwrap()[0];
         let mut key = keys::CoseKey::new();
-        key.set_alg(algs::PS256);
-        key.set_kty(keys::RSA);
-        key.set_n(vec![
+        key.set_alg(Some(algs::PS256));
+        key.set_kty(Some(keys::RSA));
+        key.set_n(Some(vec![
             188, 126, 41, 208, 223, 126, 32, 204, 157, 200, 213, 9, 224, 246, 136, 149, 146, 42,
             240, 239, 69, 33, 144, 212, 2, 198, 27, 85, 67, 52, 167, 191, 145, 201, 165, 112, 36,
             15, 153, 79, 174, 27, 105, 3, 91, 207, 173, 79, 126, 36, 158, 178, 96, 135, 194, 102,
@@ -336,8 +336,8 @@ mod test_vecs {
             254, 5, 130, 123, 121, 108, 50, 110, 62, 116, 143, 250, 124, 88, 158, 210, 115, 201,
             196, 52, 54, 205, 219, 74, 106, 34, 82, 62, 248, 188, 178, 34, 22, 21, 183, 153, 150,
             111, 26, 186, 91, 200, 75, 122, 39, 207,
-        ]);
-        key.set_e(vec![1, 0, 1]);
+        ]));
+        key.set_e(Some(vec![1, 0, 1]));
         key.set_key_ops(vec![keys::KEY_OPS_VERIFY]);
         verify.agents[v1].key(&key).unwrap();
 

@@ -696,7 +696,7 @@ impl CoseMessage {
                 ));
             } else {
                 let mut e = Encoder::new();
-                e.tag(TAGS[self.context][0])?;
+                e.tag(TAGS[self.context][0]);
                 e.array(SIZES[self.context][0]);
                 e.bytes(self.ph_bstr.as_slice());
                 self.header.encode_unprotected(&mut e)?;
@@ -717,7 +717,7 @@ impl CoseMessage {
             }
         } else {
             let mut e = Encoder::new();
-            e.tag(TAGS[self.context][1])?;
+            e.tag(TAGS[self.context][1]);
             e.array(SIZES[self.context][1]);
             e.bytes(self.ph_bstr.as_slice());
             self.header.encode_unprotected(&mut e)?;
@@ -802,7 +802,7 @@ impl CoseMessage {
                 }
             }
             Some(v) => {
-                d.skip();
+                d.null()?;
                 if self.context == ENC {
                     self.secured = v;
                 } else {

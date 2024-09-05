@@ -108,7 +108,7 @@ pub(crate) fn verify_sig(
 
 pub(crate) const MAC: &str = "MAC";
 pub(crate) const MAC0: &str = "MAC0";
-const MAC_ALL: [&str; 2] = [MAC, MAC0, MAC_RECIPIENT];
+const MAC_ALL: [&str; 3] = [MAC, MAC0, MAC_RECIPIENT];
 const MAC_STRUCT_LEN: usize = 4;
 
 pub(crate) fn gen_mac(

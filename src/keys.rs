@@ -1,5 +1,5 @@
 use crate::algs;
-use crate::cbor::{Decoder, Encoder};
+use crate::cbor::{Decoder, Encoder, CBOR_FALSE, CBOR_TRUE};
 use crate::headers;
 use rsa::pkcs8::EncodePublicKey;
 use rsa::{BigUint, RsaPrivateKey, RsaPublicKey};
@@ -627,7 +627,7 @@ impl CoseKey {
                         Some(value)
                     }
                     Err(err) => {
-                        if err == 244 || err == 245 {
+                        if err == CBOR_FALSE || err == CBOR_TRUE {
                             d.skip();
                             None
                         } else {
