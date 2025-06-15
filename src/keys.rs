@@ -701,6 +701,20 @@ impl CoseKey {
                 ));
             }
         }
+        if self.kty.ok_or(JsValue::from("Missing KTY"))? == RSA {
+            if self.k.is_some() {
+                self.n = std::mem::take(&mut self.k);
+            }
+            if self.x.is_some() {
+                self.e = std::mem::take(&mut self.x);
+            }
+            if self.y.is_some() {
+                self.rsa_d = std::mem::take(&mut self.y);
+            }
+            if self.d.is_some() {
+                self.p = std::mem::take(&mut self.d);
+            }
+        }
         Ok(())
     }
 
