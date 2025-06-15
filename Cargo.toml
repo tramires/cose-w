@@ -22,6 +22,7 @@ name = "cose"
 wasm-bindgen-test = "0.3.0"
 
 [dependencies]
+js-sys = "0.3.77"
 wasm-bindgen="0.2"
 ed25519-compact = "2.0.2"
 k256 = "0.13.1"

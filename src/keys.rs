@@ -1,6 +1,7 @@
 use crate::algs;
 use crate::cbor::{Decoder, Encoder, CBOR_FALSE, CBOR_TRUE};
 use crate::headers;
+use js_sys::{Array, Uint8Array};
 use rsa::pkcs8::EncodePublicKey;
 use rsa::{BigUint, RsaPrivateKey, RsaPublicKey};
 use wasm_bindgen::prelude::*;
@@ -117,10 +118,7 @@ pub struct CoseKey {
     pub(crate) dp: Option<Vec<u8>>,
     pub(crate) dq: Option<Vec<u8>>,
     pub(crate) qinv: Option<Vec<u8>>,
-    pub(crate) other: Option<Vec<Vec<u8>>>,
-    pub(crate) ri: Option<Vec<u8>>,
-    pub(crate) di: Option<Vec<u8>>,
-    pub(crate) ti: Option<Vec<u8>>,
+    pub(crate) other: Option<Vec<Vec<Vec<u8>>>>,
 }
 
 #[wasm_bindgen]
@@ -149,9 +147,6 @@ impl CoseKey {
             dq: None,
             qinv: None,
             other: None,
-            ri: None,
-            di: None,
-            ti: None,
         }
     }
 
@@ -326,31 +321,30 @@ impl CoseKey {
         self.qinv = qinv;
     }
     #[wasm_bindgen(getter)]
-    pub fn ri(&self) -> Option<Vec<u8>> {
-        self.ri.clone()
+    pub fn other(&self) -> Option<Array> {
+        match &self.other {
+            Some(v) => Some(
+                self.other
+                    .as_ref()
+                    .unwrap()
+                    .into_iter()
+                    .map(|primes| {
+                        primes
+                            .into_iter()
+                            .map(|prime| Uint8Array::from(&prime[..]))
+                            .collect::<Array>()
+                    })
+                    .collect::<Array>(),
+            ),
+            None => None,
+        }
     }
-    #[wasm_bindgen(setter)]
-    pub fn set_ri(&mut self, ri: Option<Vec<u8>>) {
-        self.reg_label(RI);
-        self.ri = ri;
-    }
-    #[wasm_bindgen(getter)]
-    pub fn di(&self) -> Option<Vec<u8>> {
-        self.di.clone()
-    }
-    #[wasm_bindgen(setter)]
-    pub fn set_di(&mut self, di: Option<Vec<u8>>) {
-        self.reg_label(DI);
-        self.di = di;
-    }
-    #[wasm_bindgen(getter)]
-    pub fn ti(&self) -> Option<Vec<u8>> {
-        self.ti.clone()
-    }
-    #[wasm_bindgen(setter)]
-    pub fn set_ti(&mut self, ti: Option<Vec<u8>>) {
-        self.reg_label(TI);
-        self.ti = ti;
+
+    pub fn add_other_prime(&mut self, ri: Vec<u8>, di: Vec<u8>, ti: Vec<u8>) {
+        self.reg_label(OTHER);
+        self.other
+            .get_or_insert_with(Vec::new)
+            .push([ri, di, ti].to_vec());
     }
 
     fn reg_label(&mut self, label: i32) {
@@ -515,15 +509,15 @@ impl CoseKey {
             } else if *i == OTHER {
                 let other = self.other.as_ref().ok_or(JsValue::from("MissingOther"))?;
                 e.array(other.len());
-                for i in other {
-                    e.bytes(i);
+                for v in other {
+                    e.object(3);
+                    e.signed(RI);
+                    e.bytes(&v[0]);
+                    e.signed(DI);
+                    e.bytes(&v[1]);
+                    e.signed(TI);
+                    e.bytes(&v[2]);
                 }
-            } else if *i == RI {
-                e.bytes(&self.ri.as_ref().ok_or(JsValue::from("MissingRI"))?);
-            } else if *i == DI {
-                e.bytes(&self.di.as_ref().ok_or(JsValue::from("MissingDI"))?);
-            } else if *i == TI {
-                e.bytes(&self.ti.as_ref().ok_or(JsValue::from("MissingTI"))?);
             } else {
                 return Err(("Duplicate Label ".to_owned() + &i.to_string()).into());
             }
@@ -665,18 +659,27 @@ impl CoseKey {
             } else if label == OTHER {
                 let mut other = Vec::new();
                 for _ in 0..d.array()? {
-                    other.push(d.bytes()?);
+                    if d.object()? != 3 {
+                        return Err(JsValue::from("Invalid 'Other' structure"));
+                    }
+                    let mut ri = Vec::new();
+                    let mut di = Vec::new();
+                    let mut ti = Vec::new();
+                    for _ in 0..3 {
+                        let other_label = d.signed()?;
+                        if other_label == RI {
+                            ri = d.bytes()?;
+                        } else if other_label == DI {
+                            di = d.bytes()?;
+                        } else if other_label == TI {
+                            ti = d.bytes()?;
+                        } else {
+                            return Err(JsValue::from("Invalid 'Other' prime label"));
+                        }
+                    }
+                    other.push([ri, di, ti].to_vec());
                 }
                 self.other = Some(other);
-                self.used.push(label);
-            } else if label == RI {
-                self.ri = Some(d.bytes()?);
-                self.used.push(label);
-            } else if label == DI {
-                self.di = Some(d.bytes()?);
-                self.used.push(label);
-            } else if label == TI {
-                self.ti = Some(d.bytes()?);
                 self.used.push(label);
             } else {
                 return Err(JsValue::from(
@@ -701,14 +704,22 @@ impl CoseKey {
             Ok(d)
         } else if kty == RSA {
             use rsa::pkcs1::EncodeRsaPrivateKey;
+            let mut primes = vec![
+                BigUint::from_bytes_be(self.p.as_ref().ok_or(JsValue::from("Missing P"))?),
+                BigUint::from_bytes_be(self.q.as_ref().ok_or(JsValue::from("Missing Q"))?),
+            ];
+
+            if self.other.is_some() {
+                for prime in self.other.as_ref().unwrap() {
+                    primes.push(BigUint::from_bytes_be(&prime[0]));
+                }
+            };
+
             match RsaPrivateKey::from_components(
                 BigUint::from_bytes_be(self.n.as_ref().ok_or(JsValue::from("Missing N"))?),
-                BigUint::from_bytes_be(self.e.as_ref().ok_or(JsValue::from("Missing N"))?),
-                BigUint::from_bytes_be(self.rsa_d.as_ref().ok_or(JsValue::from("Missing N"))?),
-                vec![
-                    BigUint::from_bytes_be(self.p.as_ref().ok_or(JsValue::from("Missing N"))?),
-                    BigUint::from_bytes_be(self.q.as_ref().ok_or(JsValue::from("Missing N"))?),
-                ],
+                BigUint::from_bytes_be(self.e.as_ref().ok_or(JsValue::from("Missing E"))?),
+                BigUint::from_bytes_be(self.rsa_d.as_ref().ok_or(JsValue::from("Missing D"))?),
+                primes,
             ) {
                 Ok(v) => match v.to_pkcs1_der() {
                     Ok(v2) => {

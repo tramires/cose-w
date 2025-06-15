@@ -182,6 +182,8 @@ pub(crate) const ECDH_ALGS: [i32; 10] = [
     ECDH_SS_A256KW,
 ];
 
+pub(crate) const OAEP_ALGS: [i32; 3] = [RSA_OAEP_1, RSA_OAEP_256, RSA_OAEP_512];
+
 const K16_ALGS: [i32; 11] = [
     A128GCM,
     CHACHA20,
@@ -1055,33 +1057,28 @@ pub(crate) fn aes_key_unwrap(key: &Vec<u8>, alg: i32, cek: &Vec<u8>) -> Result<V
         return Err(JsValue::from("Invalid KEK size"));
     }
 }
-pub(crate) fn rsa_oaep_enc(
-    key: &Vec<u8>,
-    size: usize,
-    cek: &Vec<u8>,
-    alg: &i32,
-) -> Result<Vec<u8>, JsValue> {
-    use rsa::pkcs1::DecodeRsaPublicKey;
+pub(crate) fn rsa_oaep_enc(key: &Vec<u8>, cek: &Vec<u8>, alg: &i32) -> Result<Vec<u8>, JsValue> {
+    use rsa::pkcs8::DecodePublicKey;
     use rsa::{Oaep, RsaPublicKey};
-    let rsa_key = RsaPublicKey::from_pkcs1_der(key).unwrap();
+    let rsa_key = RsaPublicKey::from_public_key_der(key).unwrap();
     if *alg == RSA_OAEP_1 {
         let padding = Oaep::new::<Sha1>();
         let mut rng = rand::thread_rng();
 
         let out = rsa_key.encrypt(&mut rng, padding, &cek).unwrap();
-        Ok(out[..size].to_vec())
+        Ok(out.to_vec())
     } else if *alg == RSA_OAEP_256 {
         let padding = Oaep::new::<Sha256>();
         let mut rng = rand::thread_rng();
 
         let out = rsa_key.encrypt(&mut rng, padding, &cek).unwrap();
-        Ok(out[..size].to_vec())
+        Ok(out.to_vec())
     } else if *alg == RSA_OAEP_512 {
         let padding = Oaep::new::<Sha512>();
         let mut rng = rand::thread_rng();
 
         let out = rsa_key.encrypt(&mut rng, padding, &cek).unwrap();
-        Ok(out[..size].to_vec())
+        Ok(out.to_vec())
     } else {
         return Err(JsValue::from("Invalid alg"));
     }
