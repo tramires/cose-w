@@ -450,6 +450,13 @@ impl CoseKey {
             } else if *i == CRV_K {
                 if self.crv != None {
                     e.signed(self.crv.ok_or(JsValue::from("Missing Curve"))?)
+                } else if self.kty.ok_or(JsValue::from("Missing KTY"))? == RSA {
+                    e.bytes(
+                        &self
+                            .n
+                            .as_ref()
+                            .ok_or(JsValue::from("Missing N parameter"))?,
+                    )
                 } else {
                     e.bytes(
                         &self
@@ -470,34 +477,53 @@ impl CoseKey {
                         .ok_or(JsValue::from("Missing Base IV"))?,
                 )
             } else if *i == X {
-                e.bytes(
-                    &self
-                        .x
-                        .as_ref()
-                        .ok_or(JsValue::from("Missing X parameter"))?,
-                )
+                if self.kty.ok_or(JsValue::from("Missing KTY"))? == RSA {
+                    e.bytes(
+                        &self
+                            .e
+                            .as_ref()
+                            .ok_or(JsValue::from("Missing E parameter"))?,
+                    )
+                } else {
+                    e.bytes(
+                        &self
+                            .x
+                            .as_ref()
+                            .ok_or(JsValue::from("Missing X parameter"))?,
+                    )
+                }
             } else if *i == Y {
-                e.bytes(
-                    &self
-                        .y
-                        .as_ref()
-                        .ok_or(JsValue::from("Missing Y parameter"))?,
-                )
+                if self.kty.ok_or(JsValue::from("Missing KTY"))? == RSA {
+                    e.bytes(
+                        &self
+                            .rsa_d
+                            .as_ref()
+                            .ok_or(JsValue::from("Missing D parameter"))?,
+                    )
+                } else {
+                    e.bytes(
+                        &self
+                            .y
+                            .as_ref()
+                            .ok_or(JsValue::from("Missing Y parameter"))?,
+                    )
+                }
             } else if *i == D {
-                e.bytes(
-                    &self
-                        .d
-                        .as_ref()
-                        .ok_or(JsValue::from("Missing D parameter"))?,
-                )
-            } else if *i == N {
-                e.bytes(&self.n.as_ref().ok_or(JsValue::from("MissingN"))?)
-            } else if *i == E {
-                e.bytes(&self.e.as_ref().ok_or(JsValue::from("MissingE"))?)
-            } else if *i == RSA_D {
-                e.bytes(&self.rsa_d.as_ref().ok_or(JsValue::from("MissingRsaD"))?)
-            } else if *i == P {
-                e.bytes(&self.p.as_ref().ok_or(JsValue::from("MissingP"))?)
+                if self.kty.ok_or(JsValue::from("Missing KTY"))? == RSA {
+                    e.bytes(
+                        &self
+                            .p
+                            .as_ref()
+                            .ok_or(JsValue::from("Missing P parameter"))?,
+                    )
+                } else {
+                    e.bytes(
+                        &self
+                            .d
+                            .as_ref()
+                            .ok_or(JsValue::from("Missing D parameter"))?,
+                    )
+                }
             } else if *i == Q {
                 e.bytes(&self.q.as_ref().ok_or(JsValue::from("MissingQ"))?)
             } else if *i == DP {
@@ -631,18 +657,6 @@ impl CoseKey {
                 };
             } else if label == D {
                 self.d = Some(d.bytes()?);
-                self.used.push(label);
-            } else if label == N {
-                self.n = Some(d.bytes()?);
-                self.used.push(label);
-            } else if label == E {
-                self.e = Some(d.bytes()?);
-                self.used.push(label);
-            } else if label == RSA_D {
-                self.rsa_d = Some(d.bytes()?);
-                self.used.push(label);
-            } else if label == P {
-                self.p = Some(d.bytes()?);
                 self.used.push(label);
             } else if label == Q {
                 self.q = Some(d.bytes()?);
