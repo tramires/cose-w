@@ -155,7 +155,7 @@ impl CoseMessage {
     pub fn set_party_identity(&mut self, agent: usize, id: Vec<u8>, u: bool) {
         self.agents[agent]
             .header
-            .set_party_identity(id, false, false, u);
+            .set_party_identity(id, false, false, u, false);
     }
     pub fn set_ecdh_key(&mut self, agent: usize, key: keys::CoseKey) {
         self.agents[agent].header.set_ecdh_key(key);
@@ -223,7 +223,7 @@ impl CoseMessage {
             {
                 return Err(JsValue::from("Invalid algorithm for SIGNATURE context"));
             }
-            if !agent.key_ops.contains(&keys::KEY_OPS_SIGN) {
+            if agent.key_ops.len() > 0 && !agent.key_ops.contains(&keys::KEY_OPS_SIGN) {
                 return Err(JsValue::from("Key doesn't support sign"));
             }
         } else if self.context == ENC

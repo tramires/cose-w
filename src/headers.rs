@@ -198,12 +198,23 @@ impl CoseHeader {
     pub fn party_v_identity(&self) -> Option<Vec<u8>> {
         self.party_v_identity.clone()
     }
-    pub fn set_party_identity(&mut self, identity: Vec<u8>, prot: bool, crit: bool, u: bool) {
+    pub fn set_party_identity(
+        &mut self,
+        identity: Vec<u8>,
+        prot: bool,
+        crit: bool,
+        u: bool,
+        include: bool,
+    ) {
         if u {
-            self.reg_label(PARTY_U_IDENTITY, prot, crit);
+            if include {
+                self.reg_label(PARTY_U_IDENTITY, prot, crit);
+            }
             self.party_u_identity = Some(identity);
         } else {
-            self.reg_label(PARTY_V_IDENTITY, prot, crit);
+            if include {
+                self.reg_label(PARTY_V_IDENTITY, prot, crit);
+            }
             self.party_v_identity = Some(identity);
         }
     }
