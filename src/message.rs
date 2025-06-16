@@ -638,7 +638,14 @@ impl CoseMessage {
                             self.agents[0].enc = true;
                             return Ok(());
                         } else {
-                            self.agents[0].mac(&self.payload, &aead, &self.ph_bstr, &alg)?;
+                            self.secured = cose_struct::gen_mac(
+                                &self.agents[0].s_key,
+                                &alg,
+                                &aead,
+                                cose_struct::MAC,
+                                &self.ph_bstr,
+                                &self.payload,
+                            )?;
                             self.agents[0].enc = true;
                             return Ok(());
                         }

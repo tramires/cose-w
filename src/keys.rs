@@ -83,7 +83,7 @@ pub(crate) const ED25519: i32 = 6;
 pub(crate) const ED448: i32 = 7;
 pub(crate) const CURVES_ALL: [i32; 8] =
     [P_256, P_384, P_521, X25519, X448, ED25519, ED448, SECP256K1];
-const EC2_CRVS: [i32; 3] = [P_256, P_384, P_521];
+const EC2_CRVS: [i32; 4] = [P_256, P_384, P_521, SECP256K1];
 pub(crate) const CURVES_NAMES: [&str; 8] = [
     "P-256",
     "P-384",
@@ -898,6 +898,11 @@ impl CoseKeySet {
     #[wasm_bindgen(setter)]
     pub fn set_bytes(&mut self, bytes: Vec<u8>) {
         self.bytes = bytes;
+    }
+
+    #[wasm_bindgen(getter)]
+    pub fn keys(&self) -> Vec<CoseKey> {
+        self.cose_keys.clone()
     }
 
     pub fn add_key(&mut self, key: CoseKey) {
