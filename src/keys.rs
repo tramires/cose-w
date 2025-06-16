@@ -367,8 +367,6 @@ impl CoseKey {
             Ok(())
         } else if kty == EC2 && EC2_CRVS.contains(&crv) {
             Ok(())
-        } else if self.alg.ok_or(JsValue::from("MissingAlg"))? == algs::ES256K && crv == SECP256K1 {
-            Ok(())
         } else {
             Err(JsValue::from("InvalidCRV"))
         }
@@ -393,10 +391,9 @@ impl CoseKey {
         self.bytes = e.encoded();
         Ok(())
     }
-    pub(crate) fn encode_key(&self, e: &mut Encoder) -> Result<(), JsValue> {
+    pub(crate) fn verify_key_ops(&self) -> Result<(), JsValue> {
         let kty = self.kty.ok_or(JsValue::from("Missing KTY"))?;
-        let key_ops_len = self.key_ops.len();
-        if key_ops_len > 0 {
+        if self.key_ops.len() > 0 {
             if kty == EC2 || kty == OKP {
                 if self.key_ops.contains(&KEY_OPS_VERIFY)
                     || self.key_ops.contains(&KEY_OPS_DERIVE)
@@ -434,8 +431,61 @@ impl CoseKey {
                         return Err(JsValue::from("Missing K value"));
                     }
                 }
+            } else if kty == RSA {
+                if self.key_ops.contains(&KEY_OPS_VERIFY)
+                    || self.key_ops.contains(&KEY_OPS_DERIVE)
+                    || self.key_ops.contains(&KEY_OPS_DERIVE_BITS)
+                {
+                    if self.n.is_none() {
+                        return Err(JsValue::from("Missing N parmater"));
+                    } else if self.e.is_none() {
+                        return Err(JsValue::from("Missing E parmater"));
+                    } else if [
+                        &self.rsa_d,
+                        &self.p,
+                        &self.q,
+                        &self.dp,
+                        &self.dq,
+                        &self.qinv,
+                    ]
+                    .iter()
+                    .any(|v| v.is_some())
+                        || self.other.is_some()
+                    {
+                        return Err(JsValue::from("Invalid params for RSA public key"));
+                    }
+                }
+                if self.key_ops.contains(&KEY_OPS_SIGN) {
+                    if [
+                        &self.n,
+                        &self.e,
+                        &self.rsa_d,
+                        &self.p,
+                        &self.q,
+                        &self.dp,
+                        &self.dq,
+                        &self.qinv,
+                    ]
+                    .iter()
+                    .any(|v| v.is_none())
+                    {
+                        return Err(JsValue::from("Missing RSA params"));
+                    }
+                    if self.other.is_some() {
+                        for primes in self.other.as_ref().unwrap() {
+                            if primes.len() != 3 {
+                                return Err(JsValue::from("Invalid 'Other' params"));
+                            }
+                        }
+                    }
+                }
             }
         }
+        return Ok(());
+    }
+    pub(crate) fn encode_key(&self, e: &mut Encoder) -> Result<(), JsValue> {
+        let kty = self.kty.ok_or(JsValue::from("Missing KTY"))?;
+        self.verify_key_ops()?;
         e.object(self.used.len());
         for i in &self.used {
             e.signed(*i);
@@ -715,6 +765,7 @@ impl CoseKey {
                 self.p = std::mem::take(&mut self.d);
             }
         }
+        self.verify_key_ops()?;
         Ok(())
     }
 

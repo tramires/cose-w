@@ -91,7 +91,7 @@ impl CoseAgent {
         alg: &i32,
         iv: &Vec<u8>,
     ) -> Result<Vec<u8>, JsValue> {
-        if !self.key_ops.contains(&keys::KEY_OPS_ENCRYPT) {
+        if self.key_ops.len() > 0 && !self.key_ops.contains(&keys::KEY_OPS_ENCRYPT) {
             return Err(JsValue::from("Missing Key key_ops_encrypt"));
         }
         Ok(cose_struct::gen_cipher(
@@ -110,10 +110,10 @@ impl CoseAgent {
         external_aad: &Vec<u8>,
         body_protected: &Vec<u8>,
     ) -> Result<(), JsValue> {
-        self.ph_bstr = self.header.get_protected_bstr(false)?;
-        if !self.key_ops.contains(&keys::KEY_OPS_SIGN) {
+        if self.key_ops.len() > 0 && !self.key_ops.contains(&keys::KEY_OPS_SIGN) {
             return Err(JsValue::from("Missing Key key_ops_sign"));
         }
+        self.ph_bstr = self.header.get_protected_bstr(false)?;
         self.payload = cose_struct::gen_sig(
             &self.s_key,
             &self.header.alg.ok_or(JsValue::from("Missing alg"))?,
@@ -132,7 +132,7 @@ impl CoseAgent {
         external_aad: &Vec<u8>,
         body_protected: &Vec<u8>,
     ) -> Result<bool, JsValue> {
-        if !self.key_ops.contains(&keys::KEY_OPS_VERIFY) {
+        if self.key_ops.len() > 0 && !self.key_ops.contains(&keys::KEY_OPS_VERIFY) {
             return Err(JsValue::from("Missing Key key_ops_verify"));
         }
         Ok(cose_struct::verify_sig(
@@ -154,10 +154,10 @@ impl CoseAgent {
         body_protected: &Vec<u8>,
         alg: &i32,
     ) -> Result<Vec<u8>, JsValue> {
-        self.ph_bstr = self.header.get_protected_bstr(false)?;
-        if !self.key_ops.contains(&keys::KEY_OPS_MAC) {
+        if self.key_ops.len() > 0 && !self.key_ops.contains(&keys::KEY_OPS_MAC) {
             return Err(JsValue::from("Key op not supported"));
         }
+        self.ph_bstr = self.header.get_protected_bstr(false)?;
         Ok(cose_struct::gen_mac(
             &self.s_key,
             &alg,
@@ -383,11 +383,27 @@ impl CoseAgent {
             if key.key_ops.contains(&keys::KEY_OPS_VERIFY) {
                 self.pub_key = key.get_pub_key()?;
             }
+            if key.key_ops.len() == 0 {
+                self.s_key = match key.get_s_key() {
+                    Ok(v) => v,
+                    Err(_) => Vec::new(),
+                };
+                self.pub_key = match key.get_pub_key() {
+                    Ok(v) => v,
+                    Err(_) => Vec::new(),
+                };
+            }
         } else if algs::KEY_DISTRIBUTION_ALGS.contains(&alg) || algs::ENCRYPT_ALGS.contains(&alg) {
             if KEY_OPS_SKEY.iter().any(|i| key.key_ops.contains(i)) {
                 self.s_key = key.get_s_key()?;
             }
-            if algs::ECDH_ALGS.contains(&alg) {
+            if key.key_ops.len() == 0 {
+                self.s_key = match key.get_s_key() {
+                    Ok(v) => v,
+                    Err(_) => Vec::new(),
+                };
+            }
+            if algs::ECDH_ALGS.contains(&alg) || algs::OAEP_ALGS.contains(&alg) {
                 if key.key_ops.len() == 0 {
                     self.pub_key = key.get_pub_key()?;
                 }

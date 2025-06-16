@@ -269,15 +269,21 @@ impl CoseMessage {
 
         if self.context == SIG {
             self.crv = cose_key.crv;
-            if cose_key.key_ops.contains(&keys::KEY_OPS_SIGN) {
-                let priv_key = cose_key.get_s_key()?;
+            if cose_key.key_ops.len() == 0 || cose_key.key_ops.contains(&keys::KEY_OPS_SIGN) {
+                let priv_key = match cose_key.get_s_key() {
+                    Ok(v) => v,
+                    Err(_) => Vec::new(),
+                };
                 if priv_key.len() > 0 {
                     self.key_encode = true;
                     self.priv_key = priv_key;
                 }
             }
-            if cose_key.key_ops.contains(&keys::KEY_OPS_VERIFY) {
-                let pub_key = cose_key.get_pub_key()?;
+            if cose_key.key_ops.len() == 0 || cose_key.key_ops.contains(&keys::KEY_OPS_VERIFY) {
+                let pub_key = match cose_key.get_pub_key() {
+                    Ok(v) => v,
+                    Err(_) => Vec::new(),
+                };
                 if pub_key.len() > 0 {
                     self.key_decode = true;
                     self.pub_key = pub_key;
@@ -289,13 +295,21 @@ impl CoseMessage {
             }
             let key = cose_key.get_s_key()?;
             if key.len() > 0 {
-                if (self.context == ENC && cose_key.key_ops.contains(&keys::KEY_OPS_ENCRYPT))
-                    || (self.context == MAC && cose_key.key_ops.contains(&keys::KEY_OPS_MAC))
+                if (self.context == ENC
+                    && (cose_key.key_ops.len() == 0
+                        || cose_key.key_ops.contains(&keys::KEY_OPS_ENCRYPT)))
+                    || (self.context == MAC
+                        && (cose_key.key_ops.len() == 0
+                            || cose_key.key_ops.contains(&keys::KEY_OPS_MAC)))
                 {
                     self.key_encode = true;
                 }
-                if (self.context == ENC && cose_key.key_ops.contains(&keys::KEY_OPS_DECRYPT))
-                    || (self.context == MAC && cose_key.key_ops.contains(&keys::KEY_OPS_MAC_VERIFY))
+                if (self.context == ENC
+                    && (cose_key.key_ops.len() == 0
+                        || cose_key.key_ops.contains(&keys::KEY_OPS_DECRYPT)))
+                    || (self.context == MAC
+                        && (cose_key.key_ops.len() == 0
+                            || cose_key.key_ops.contains(&keys::KEY_OPS_MAC_VERIFY)))
                 {
                     self.key_decode = true;
                 }
@@ -586,7 +600,9 @@ impl CoseMessage {
                             .ok_or(JsValue::from("Missing algorithm"))?,
                     ) {
                         return Err(JsValue::from("Invalid Algorithm"));
-                    } else if !self.agents[i].key_ops.contains(&keys::KEY_OPS_SIGN) {
+                    } else if self.agents[i].key_ops.len() > 0
+                        && !self.agents[i].key_ops.contains(&keys::KEY_OPS_SIGN)
+                    {
                         return Err(JsValue::from("Key op not supported"));
                     } else {
                         self.agents[i].sign(&self.payload, &aead, &self.ph_bstr)?;
@@ -606,7 +622,9 @@ impl CoseMessage {
                     if self.agents.len() > 1 {
                         return Err(JsValue::from("Only one recipient allowed for algorithm"));
                     }
-                    if !self.agents[0].key_ops.contains(&KO[self.context][0]) {
+                    if self.agents[0].key_ops.len() > 0
+                        && !self.agents[0].key_ops.contains(&KO[self.context][0])
+                    {
                         return Err(JsValue::from("Key op not supported"));
                     } else {
                         if self.context == ENC {
@@ -975,7 +993,8 @@ impl CoseMessage {
             let index = agent.ok_or(JsValue::from("Missing Agent"))?;
             if self.context == SIG {
                 if self.agents[index].pub_key.len() == 0
-                    || !self.agents[index].key_ops.contains(&keys::KEY_OPS_VERIFY)
+                    || (self.agents[index].key_ops.len() > 0
+                        && !self.agents[index].key_ops.contains(&keys::KEY_OPS_VERIFY))
                 {
                     Err(JsValue::from("Key Op not supported"))
                 } else {
@@ -994,7 +1013,9 @@ impl CoseMessage {
                         .alg
                         .ok_or(JsValue::from("Missing algorithm"))?
                 {
-                    if !self.agents[index].key_ops.contains(&KO[self.context][1]) {
+                    if self.agents[index].key_ops.len() > 0
+                        && !self.agents[index].key_ops.contains(&KO[self.context][1])
+                    {
                         return Err(JsValue::from("Key op not supported"));
                     } else {
                         if self.agents[index].s_key.len() > 0 {
