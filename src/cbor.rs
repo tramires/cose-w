@@ -77,6 +77,13 @@ impl Encoder {
     pub fn null(&mut self) {
         self.encoded.push(CBOR_NULL);
     }
+    pub fn bool(&mut self, v: bool) {
+        if v {
+            self.encoded.push(CBOR_TRUE);
+        } else {
+            self.encoded.push(CBOR_FALSE);
+        }
+    }
     pub fn encoded(&self) -> Vec<u8> {
         self.encoded.clone()
     }
@@ -166,6 +173,18 @@ impl Decoder {
 
     pub fn tag(&mut self) -> Result<u32, u8> {
         Ok(self.major_ai(MAJOR_TAG)? as u32)
+    }
+    pub fn bool(&mut self) -> Result<bool, u8> {
+        let first = self.encoded[self.index];
+        if first == CBOR_TRUE {
+            self.index += 1;
+            Ok(true)
+        } else if first == CBOR_FALSE {
+            self.index += 1;
+            Ok(false)
+        } else {
+            Err(first)
+        }
     }
     pub fn null(&mut self) -> Result<(), u8> {
         let first = self.encoded[self.index];

@@ -106,6 +106,7 @@ pub struct CoseKey {
     pub(crate) alg: Option<i32>,
     pub(crate) x: Option<Vec<u8>>,
     pub(crate) y: Option<Vec<u8>>,
+    pub(crate) y_parity: Option<bool>,
     pub(crate) d: Option<Vec<u8>>,
     pub(crate) k: Option<Vec<u8>>,
     pub(crate) kid: Option<Vec<u8>>,
@@ -134,6 +135,7 @@ impl CoseKey {
             alg: None,
             x: None,
             y: None,
+            y_parity: None,
             d: None,
             k: None,
             kid: None,
@@ -209,8 +211,19 @@ impl CoseKey {
     }
     #[wasm_bindgen(setter)]
     pub fn set_y(&mut self, y: Option<Vec<u8>>) {
+        self.y_parity = None;
         self.reg_label(Y);
         self.y = y;
+    }
+    #[wasm_bindgen(getter)]
+    pub fn y_parity(&self) -> Option<bool> {
+        self.y_parity.clone()
+    }
+    #[wasm_bindgen(setter)]
+    pub fn set_y_parity(&mut self, parity: Option<bool>) {
+        self.y = None;
+        self.reg_label(Y);
+        self.y_parity = parity;
     }
     #[wasm_bindgen(getter)]
     pub fn d(&self) -> Option<Vec<u8>> {
@@ -401,6 +414,8 @@ impl CoseKey {
                 {
                     if self.x == None {
                         return Err(JsValue::from("Missing X parameter"));
+                    } else if kty == EC2 && self.y.is_none() && self.y_parity.is_none() {
+                        return Err(JsValue::from("Missing Y parameter"));
                     } else if self.crv == None {
                         return Err(JsValue::from("Missing Curve"));
                     }
@@ -422,7 +437,7 @@ impl CoseKey {
                 {
                     if self.x != None {
                         return Err(JsValue::from("Invalid X value"));
-                    } else if self.y != None {
+                    } else if self.y.is_some() || self.y_parity.is_some() {
                         return Err(JsValue::from("Invalid Y value"));
                     } else if self.d != None {
                         return Err(JsValue::from("Invalid D value"));
@@ -551,12 +566,16 @@ impl CoseKey {
                             .ok_or(JsValue::from("Missing D parameter"))?,
                     )
                 } else {
-                    e.bytes(
-                        &self
-                            .y
-                            .as_ref()
-                            .ok_or(JsValue::from("Missing Y parameter"))?,
-                    )
+                    if self.y_parity.is_none() {
+                        e.bytes(
+                            &self
+                                .y
+                                .as_ref()
+                                .ok_or(JsValue::from("Missing Y parameter"))?,
+                        )
+                    } else {
+                        e.bool(self.y_parity.ok_or(JsValue::from("Missing Y parameters"))?)
+                    }
                 }
             } else if *i == D {
                 if self.kty.ok_or(JsValue::from("Missing KTY"))? == RSA {
@@ -698,7 +717,7 @@ impl CoseKey {
                     }
                     Err(err) => {
                         if err == CBOR_FALSE || err == CBOR_TRUE {
-                            d.skip();
+                            self.y_parity = Some(d.bool()?);
                             None
                         } else {
                             return Err(JsValue::from("Invalid Y parameter"));
@@ -845,7 +864,15 @@ impl CoseKey {
                     pub_key.append(&mut x);
                     pub_key.append(&mut y);
                 } else {
-                    pub_key = vec![3];
+                    if self.y_parity.is_some() {
+                        if self.y_parity.unwrap() {
+                            pub_key = vec![3];
+                        } else {
+                            pub_key = vec![2];
+                        }
+                    } else {
+                        return Err(JsValue::from("MissingY"));
+                    }
                     pub_key.append(&mut x);
                 }
             } else {

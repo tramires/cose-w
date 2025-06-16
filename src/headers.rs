@@ -1,6 +1,6 @@
 use crate::agent::CoseAgent;
 use crate::algs;
-use crate::cbor::{Decoder, Encoder};
+use crate::cbor::{Decoder, Encoder, CBOR_NULL};
 use crate::keys;
 use wasm_bindgen::prelude::*;
 
@@ -478,7 +478,7 @@ impl CoseHeader {
             self.party_u_nonce = match decoder.bytes() {
                 Ok(value) => Some(value),
                 Err(err) => {
-                    if err == 246 {
+                    if err == CBOR_NULL {
                         None
                     } else {
                         return Err(JsValue::from("Invalid COSE Structure"));
@@ -493,7 +493,7 @@ impl CoseHeader {
             self.party_v_nonce = match decoder.bytes() {
                 Ok(value) => Some(value),
                 Err(err) => {
-                    if err == 246 {
+                    if err == CBOR_NULL {
                         None
                     } else {
                         return Err(JsValue::from("Invalid COSE Structure"));
