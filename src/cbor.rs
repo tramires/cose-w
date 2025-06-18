@@ -195,7 +195,4 @@ impl Decoder {
             Err(first)
         }
     }
-    pub fn skip(&mut self) {
-        self.index += 1;
-    }
 }

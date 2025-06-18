@@ -25,28 +25,25 @@ pub(crate) const STATIC_KEY: i32 = -2;
 pub(crate) const STATIC_KEY_ID: i32 = -3;
 
 pub(crate) fn get_alg_id(alg: &str) -> Result<i32, JsValue> {
-    for i in 0..algs::SIGNING_ALGS.len() {
-        if algs::SIGNING_ALGS_NAMES[i] == alg {
-            return Ok(algs::SIGNING_ALGS[i]);
-        }
-    }
-    for i in 0..algs::ENCRYPT_ALGS.len() {
-        if algs::ENCRYPT_ALGS_NAMES[i] == alg {
-            return Ok(algs::ENCRYPT_ALGS[i]);
-        }
-    }
-    for i in 0..algs::MAC_ALGS.len() {
-        if algs::MAC_ALGS_NAMES[i] == alg {
-            return Ok(algs::MAC_ALGS[i]);
-        }
-    }
-    for i in 0..algs::KEY_DISTRIBUTION_ALGS.len() {
-        if algs::KEY_DISTRIBUTION_NAMES[i] == alg {
-            return Ok(algs::KEY_DISTRIBUTION_ALGS[i]);
-        }
-    }
-    Err("Invalid Algorithm".into())
+    algs::SIGNING_ALGS_NAMES
+        .iter()
+        .zip(algs::SIGNING_ALGS.iter())
+        .chain(
+            algs::ENCRYPT_ALGS_NAMES
+                .iter()
+                .zip(algs::ENCRYPT_ALGS.iter()),
+        )
+        .chain(algs::MAC_ALGS_NAMES.iter().zip(algs::MAC_ALGS.iter()))
+        .chain(
+            algs::KEY_DISTRIBUTION_NAMES
+                .iter()
+                .zip(algs::KEY_DISTRIBUTION_ALGS.iter()),
+        )
+        .find(|(name, _)| **name == alg)
+        .map(|(_, &val)| val)
+        .ok_or_else(|| "Invalid Algorithm".into())
 }
+
 pub(crate) fn get_kty_id(kty: &str) -> Result<i32, JsValue> {
     for i in 0..keys::KTY_ALL.len() {
         if keys::KTY_NAMES[i] == kty {
@@ -337,95 +334,112 @@ impl CoseHeader {
         encoder: &mut Encoder,
         protected: bool,
     ) -> Result<(), JsValue> {
-        if label == ALG {
-            encoder.signed(self.alg.ok_or(JsValue::from("Missing alg"))?);
-        } else if label == KID {
-            encoder.bytes(&self.kid.as_ref().ok_or(JsValue::from("Missing KID"))?);
-        } else if label == IV {
-            encoder.bytes(&self.iv.as_ref().ok_or(JsValue::from("Missing IV"))?);
-        } else if label == PARTIAL_IV {
-            encoder.bytes(
-                &self
-                    .partial_iv
-                    .as_ref()
-                    .ok_or(JsValue::from("Missing Partial IV"))?,
-            );
-        } else if label == SALT {
-            encoder.bytes(&self.salt.as_ref().ok_or(JsValue::from("Missing salt"))?);
-        } else if label == CONTENT_TYPE {
-            match &self
-                .content_type
-                .as_ref()
-                .ok_or(JsValue::from("Missing content-type"))?
-            {
-                ContentTypeTypes::Uint(v) => encoder.unsigned(*v),
-                ContentTypeTypes::Tstr(v) => encoder.text(v),
+        match label {
+            ALG => {
+                encoder.signed(self.alg.ok_or(JsValue::from("Missing alg"))?);
             }
-        } else if label == PARTY_U_IDENTITY {
-            encoder.bytes(
-                &self
-                    .party_u_identity
-                    .as_ref()
-                    .ok_or(JsValue::from("Missing Party U Identity"))?,
-            );
-        } else if label == PARTY_U_NONCE {
-            encoder.bytes(
-                &self
-                    .party_u_nonce
-                    .as_ref()
-                    .ok_or(JsValue::from("Missing Party U Nonce"))?,
-            );
-        } else if label == PARTY_U_OTHER {
-            encoder.bytes(
-                &self
-                    .party_u_other
-                    .as_ref()
-                    .ok_or(JsValue::from("Missing Party U Other"))?,
-            );
-        } else if label == PARTY_V_IDENTITY {
-            encoder.bytes(
-                &self
-                    .party_v_identity
-                    .as_ref()
-                    .ok_or(JsValue::from("Missing Party V Identity"))?,
-            );
-        } else if label == PARTY_V_NONCE {
-            encoder.bytes(
-                &self
-                    .party_v_nonce
-                    .as_ref()
-                    .ok_or(JsValue::from("Missing Party V Nonce"))?,
-            );
-        } else if label == PARTY_V_OTHER {
-            encoder.bytes(
-                &self
-                    .party_v_other
-                    .as_ref()
-                    .ok_or(JsValue::from("Missing Party V Other"))?,
-            );
-        } else if label == EPHEMERAL_KEY || label == STATIC_KEY {
-            let mut ecdh_key = self.ecdh_key.clone();
-            ecdh_key.remove_label(keys::D);
-            ecdh_key.d = None;
-            ecdh_key.encode_key(encoder)?;
-        } else if label == STATIC_KEY_ID {
-            encoder.bytes(
-                &self
-                    .static_kid
-                    .as_ref()
-                    .ok_or(JsValue::from("Missing Static KID"))?,
-            );
-        } else if label == COUNTER_SIG && !protected {
-            if self.counters.len() > 1 {
-                encoder.array(self.counters.len());
+            KID => {
+                encoder.bytes(&self.kid.as_ref().ok_or(JsValue::from("Missing KID"))?);
             }
-            for counter in &mut self.counters {
-                counter.encode(encoder)?;
+            IV => {
+                encoder.bytes(&self.iv.as_ref().ok_or(JsValue::from("Missing IV"))?);
             }
-        } else {
-            return Err(JsValue::from(
-                "Invalid label ".to_owned() + &label.to_string(),
-            ));
+            PARTIAL_IV => {
+                encoder.bytes(
+                    &self
+                        .partial_iv
+                        .as_ref()
+                        .ok_or(JsValue::from("Missing Partial IV"))?,
+                );
+            }
+            SALT => {
+                encoder.bytes(&self.salt.as_ref().ok_or(JsValue::from("Missing salt"))?);
+            }
+            CONTENT_TYPE => {
+                match &self
+                    .content_type
+                    .as_ref()
+                    .ok_or(JsValue::from("Missing content-type"))?
+                {
+                    ContentTypeTypes::Uint(v) => encoder.unsigned(*v),
+                    ContentTypeTypes::Tstr(v) => encoder.text(v),
+                }
+            }
+            PARTY_U_IDENTITY => {
+                encoder.bytes(
+                    &self
+                        .party_u_identity
+                        .as_ref()
+                        .ok_or(JsValue::from("Missing Party U Identity"))?,
+                );
+            }
+            PARTY_U_NONCE => {
+                encoder.bytes(
+                    &self
+                        .party_u_nonce
+                        .as_ref()
+                        .ok_or(JsValue::from("Missing Party U Nonce"))?,
+                );
+            }
+            PARTY_U_OTHER => {
+                encoder.bytes(
+                    &self
+                        .party_u_other
+                        .as_ref()
+                        .ok_or(JsValue::from("Missing Party U Other"))?,
+                );
+            }
+            PARTY_V_IDENTITY => {
+                encoder.bytes(
+                    &self
+                        .party_v_identity
+                        .as_ref()
+                        .ok_or(JsValue::from("Missing Party V Identity"))?,
+                );
+            }
+            PARTY_V_NONCE => {
+                encoder.bytes(
+                    &self
+                        .party_v_nonce
+                        .as_ref()
+                        .ok_or(JsValue::from("Missing Party V Nonce"))?,
+                );
+            }
+            PARTY_V_OTHER => {
+                encoder.bytes(
+                    &self
+                        .party_v_other
+                        .as_ref()
+                        .ok_or(JsValue::from("Missing Party V Other"))?,
+                );
+            }
+            EPHEMERAL_KEY | STATIC_KEY => {
+                let mut ecdh_key = self.ecdh_key.clone();
+                ecdh_key.remove_label(keys::D);
+                ecdh_key.d = None;
+                ecdh_key.encode_key(encoder)?;
+            }
+            STATIC_KEY_ID => {
+                encoder.bytes(
+                    &self
+                        .static_kid
+                        .as_ref()
+                        .ok_or(JsValue::from("Missing Static KID"))?,
+                );
+            }
+            COUNTER_SIG if !protected => {
+                if self.counters.len() > 1 {
+                    encoder.array(self.counters.len());
+                }
+                for counter in &mut self.counters {
+                    counter.encode(encoder)?;
+                }
+            }
+            _ => {
+                return Err(JsValue::from(
+                    "Invalid label ".to_owned() + &label.to_string(),
+                ));
+            }
         }
         Ok(())
     }
@@ -441,111 +455,130 @@ impl CoseHeader {
         } else {
             self.unprotected.push(label);
         }
-        if label == ALG {
-            self.alg = match decoder.signed() {
-                Ok(value) => Some(value),
-                Err(_) => match decoder.text() {
-                    Ok(value) => Some(get_alg_id(value)?),
-                    Err(_) => {
-                        return Err(JsValue::from("Invalid COSE Structure"));
-                    }
-                },
-            };
-        } else if label == CRIT && protected {
-            self.crit = Vec::new();
-            for _ in 0..decoder.array()? {
-                self.crit.push(decoder.signed()?);
+        match label {
+            ALG => {
+                self.alg = match decoder.signed() {
+                    Ok(value) => Some(value),
+                    Err(_) => match decoder.text() {
+                        Ok(value) => Some(get_alg_id(value)?),
+                        Err(_) => {
+                            return Err(JsValue::from("Invalid COSE Structure"));
+                        }
+                    },
+                };
             }
-        } else if label == CONTENT_TYPE {
-            self.content_type = match decoder.unsigned() {
-                Ok(value) => Some(ContentTypeTypes::Uint(value)),
-                Err(_) => match decoder.text() {
-                    Ok(value) => Some(ContentTypeTypes::Tstr(value.to_string())),
-                    Err(_) => {
-                        return Err(JsValue::from("Invalid COSE Structure"));
-                    }
-                },
-            };
-        } else if label == KID {
-            self.kid = Some(decoder.bytes()?.to_vec());
-        } else if label == IV {
-            self.iv = Some(decoder.bytes()?);
-        } else if label == SALT {
-            self.salt = Some(decoder.bytes()?);
-        } else if label == PARTY_U_IDENTITY {
-            self.party_u_identity = Some(decoder.bytes()?);
-        } else if label == PARTY_U_NONCE {
-            self.party_u_nonce = match decoder.bytes() {
-                Ok(value) => Some(value),
-                Err(err) => {
-                    if err == CBOR_NULL {
-                        None
-                    } else {
-                        return Err(JsValue::from("Invalid COSE Structure"));
-                    }
+            CRIT if protected => {
+                self.crit = Vec::new();
+                for _ in 0..decoder.array()? {
+                    self.crit.push(decoder.signed()?);
                 }
-            };
-        } else if label == PARTY_U_OTHER {
-            self.party_u_other = Some(decoder.bytes()?);
-        } else if label == PARTY_V_IDENTITY {
-            self.party_v_identity = Some(decoder.bytes()?);
-        } else if label == PARTY_V_NONCE {
-            self.party_v_nonce = match decoder.bytes() {
-                Ok(value) => Some(value),
-                Err(err) => {
-                    if err == CBOR_NULL {
-                        None
-                    } else {
-                        return Err(JsValue::from("Invalid COSE Structure"));
+            }
+            CONTENT_TYPE => {
+                self.content_type = match decoder.unsigned() {
+                    Ok(value) => Some(ContentTypeTypes::Uint(value)),
+                    Err(_) => match decoder.text() {
+                        Ok(value) => Some(ContentTypeTypes::Tstr(value.to_string())),
+                        Err(_) => {
+                            return Err(JsValue::from("Invalid COSE Structure"));
+                        }
+                    },
+                };
+            }
+            KID => {
+                self.kid = Some(decoder.bytes()?.to_vec());
+            }
+            IV => {
+                self.iv = Some(decoder.bytes()?);
+            }
+            SALT => {
+                self.salt = Some(decoder.bytes()?);
+            }
+            PARTY_U_IDENTITY => {
+                self.party_u_identity = Some(decoder.bytes()?);
+            }
+            PARTY_U_NONCE => {
+                self.party_u_nonce = match decoder.bytes() {
+                    Ok(value) => Some(value),
+                    Err(err) => {
+                        if err == CBOR_NULL {
+                            None
+                        } else {
+                            return Err(JsValue::from("Invalid COSE Structure"));
+                        }
                     }
-                }
-            };
-        } else if label == PARTY_V_OTHER {
-            self.party_v_other = Some(decoder.bytes()?);
-        } else if label == PARTIAL_IV {
-            self.partial_iv = Some(decoder.bytes()?);
-        } else if label == EPHEMERAL_KEY {
-            self.ecdh_key.decode_key(decoder)?;
-        } else if label == STATIC_KEY {
-            self.ecdh_key.decode_key(decoder)?;
-        } else if label == STATIC_KEY_ID {
-            self.static_kid = Some(decoder.bytes()?);
-        } else if label == COUNTER_SIG && !is_counter_sig {
-            let mut counter = CoseAgent::new_counter_sig();
-            let n = decoder.array()?;
-            let mut n1 = 0;
-            match decoder.bytes() {
-                Ok(value) => {
-                    counter.ph_bstr = value;
-                }
-                Err(_) => match decoder.array() {
+                };
+            }
+            PARTY_U_OTHER => {
+                self.party_u_other = Some(decoder.bytes()?);
+            }
+            PARTY_V_IDENTITY => {
+                self.party_v_identity = Some(decoder.bytes()?);
+            }
+            PARTY_V_NONCE => {
+                self.party_v_nonce = match decoder.bytes() {
+                    Ok(value) => Some(value),
+                    Err(err) => {
+                        if err == CBOR_NULL {
+                            None
+                        } else {
+                            return Err(JsValue::from("Invalid COSE Structure"));
+                        }
+                    }
+                };
+            }
+            PARTY_V_OTHER => {
+                self.party_v_other = Some(decoder.bytes()?);
+            }
+            PARTIAL_IV => {
+                self.partial_iv = Some(decoder.bytes()?);
+            }
+            EPHEMERAL_KEY => {
+                self.ecdh_key.decode_key(decoder)?;
+            }
+            STATIC_KEY => {
+                self.ecdh_key.decode_key(decoder)?;
+            }
+            STATIC_KEY_ID => {
+                self.static_kid = Some(decoder.bytes()?);
+            }
+            COUNTER_SIG if !is_counter_sig => {
+                let mut counter = CoseAgent::new_counter_sig();
+                let n = decoder.array()?;
+                let mut n1 = 0;
+                match decoder.bytes() {
                     Ok(value) => {
-                        n1 = value;
+                        counter.ph_bstr = value;
                     }
-                    Err(_) => {
-                        return Err(JsValue::from("Invalid COSE Structure"));
-                    }
-                },
-            };
-            if n1 == 0 && n == 3 {
-                counter.decode(decoder)?;
-                self.counters.push(counter);
-            } else {
-                counter.ph_bstr = decoder.bytes()?;
-                counter.decode(decoder)?;
-                self.counters.push(counter);
-                for _ in 1..n {
-                    counter = CoseAgent::new_counter_sig();
-                    decoder.array()?;
+                    Err(_) => match decoder.array() {
+                        Ok(value) => {
+                            n1 = value;
+                        }
+                        Err(_) => {
+                            return Err(JsValue::from("Invalid COSE Structure"));
+                        }
+                    },
+                };
+                if n1 == 0 && n == 3 {
+                    counter.decode(decoder)?;
+                    self.counters.push(counter);
+                } else {
                     counter.ph_bstr = decoder.bytes()?;
                     counter.decode(decoder)?;
                     self.counters.push(counter);
+                    for _ in 1..n {
+                        counter = CoseAgent::new_counter_sig();
+                        decoder.array()?;
+                        counter.ph_bstr = decoder.bytes()?;
+                        counter.decode(decoder)?;
+                        self.counters.push(counter);
+                    }
                 }
             }
-        } else {
-            return Err(JsValue::from(
-                "Invalid label ".to_owned() + &label.to_string(),
-            ));
+            _ => {
+                return Err(JsValue::from(
+                    "Invalid label ".to_owned() + &label.to_string(),
+                ));
+            }
         }
         Ok(())
     }

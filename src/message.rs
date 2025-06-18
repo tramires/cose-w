@@ -223,7 +223,7 @@ impl CoseMessage {
             {
                 return Err(JsValue::from("Invalid algorithm for SIGNATURE context"));
             }
-            if agent.key_ops.len() > 0 && !agent.key_ops.contains(&keys::KEY_OPS_SIGN) {
+            if !agent.key_ops.is_empty() && !agent.key_ops.contains(&keys::KEY_OPS_SIGN) {
                 return Err(JsValue::from("Key doesn't support sign"));
             }
         } else if self.context == ENC
@@ -257,7 +257,7 @@ impl CoseMessage {
     }
 
     pub fn key(&mut self, cose_key: &keys::CoseKey) -> Result<(), JsValue> {
-        if self.agents.len() > 0 {
+        if !self.agents.is_empty() {
             return Err(JsValue::from("Invalid Operation for Context"));
         }
         cose_key.verify_kty()?;
@@ -269,22 +269,22 @@ impl CoseMessage {
 
         if self.context == SIG {
             self.crv = cose_key.crv;
-            if cose_key.key_ops.len() == 0 || cose_key.key_ops.contains(&keys::KEY_OPS_SIGN) {
+            if cose_key.key_ops.is_empty() || cose_key.key_ops.contains(&keys::KEY_OPS_SIGN) {
                 let priv_key = match cose_key.get_s_key() {
                     Ok(v) => v,
                     Err(_) => Vec::new(),
                 };
-                if priv_key.len() > 0 {
+                if !priv_key.is_empty() {
                     self.key_encode = true;
                     self.priv_key = priv_key;
                 }
             }
-            if cose_key.key_ops.len() == 0 || cose_key.key_ops.contains(&keys::KEY_OPS_VERIFY) {
+            if cose_key.key_ops.is_empty() || cose_key.key_ops.contains(&keys::KEY_OPS_VERIFY) {
                 let pub_key = match cose_key.get_pub_key() {
                     Ok(v) => v,
                     Err(_) => Vec::new(),
                 };
-                if pub_key.len() > 0 {
+                if !pub_key.is_empty() {
                     self.key_decode = true;
                     self.pub_key = pub_key;
                 }
@@ -294,21 +294,21 @@ impl CoseMessage {
                 self.base_iv = cose_key.base_iv.clone();
             }
             let key = cose_key.get_s_key()?;
-            if key.len() > 0 {
+            if !key.is_empty() {
                 if (self.context == ENC
-                    && (cose_key.key_ops.len() == 0
+                    && (cose_key.key_ops.is_empty()
                         || cose_key.key_ops.contains(&keys::KEY_OPS_ENCRYPT)))
                     || (self.context == MAC
-                        && (cose_key.key_ops.len() == 0
+                        && (cose_key.key_ops.is_empty()
                             || cose_key.key_ops.contains(&keys::KEY_OPS_MAC)))
                 {
                     self.key_encode = true;
                 }
                 if (self.context == ENC
-                    && (cose_key.key_ops.len() == 0
+                    && (cose_key.key_ops.is_empty()
                         || cose_key.key_ops.contains(&keys::KEY_OPS_DECRYPT)))
                     || (self.context == MAC
-                        && (cose_key.key_ops.len() == 0
+                        && (cose_key.key_ops.is_empty()
                             || cose_key.key_ops.contains(&keys::KEY_OPS_MAC_VERIFY)))
                 {
                     self.key_decode = true;
@@ -350,7 +350,7 @@ impl CoseMessage {
                 ph_bstr = &self.ph_bstr;
             }
         };
-        if to_sig.len() == 0 && agent == None {
+        if to_sig.is_empty() && agent == None {
             return Err(JsValue::from(
                 "Missing ".to_owned() + MISS_ERR[self.context],
             ));
@@ -391,7 +391,7 @@ impl CoseMessage {
                 ph_bstr = &self.ph_bstr;
             }
         };
-        if to_sig.len() == 0 && agent == None {
+        if to_sig.is_empty() && agent == None {
             return Err(JsValue::from(
                 "Missing ".to_owned() + MISS_ERR[self.context],
             ));
@@ -432,7 +432,7 @@ impl CoseMessage {
                     to_sig = &self.secured;
                 }
                 let ph_bstr = &self.ph_bstr;
-                if to_sig.len() == 0 {
+                if to_sig.is_empty() {
                     return Err(JsValue::from(
                         "Missing ".to_owned() + MISS_ERR[self.context],
                     ));
@@ -473,7 +473,7 @@ impl CoseMessage {
                 counter_to_ver = &self.header.counters[counter];
             }
         }
-        if agent == None && to_sig.len() == 0 {
+        if agent == None && to_sig.is_empty() {
             return Err(JsValue::from(
                 "Missing ".to_owned() + MISS_ERR[self.context],
             ));
@@ -519,7 +519,7 @@ impl CoseMessage {
     }
 
     pub fn secure_content(&mut self, external_aad: Option<Vec<u8>>) -> Result<(), JsValue> {
-        if self.payload.len() <= 0 {
+        if self.payload.is_empty() {
             return Err(JsValue::from("Missing payload"));
         }
         self.ph_bstr = self.header.get_protected_bstr(true)?;
@@ -527,7 +527,7 @@ impl CoseMessage {
             None => Vec::new(),
             Some(v) => v,
         };
-        if self.agents.len() <= 0 {
+        if self.agents.is_empty() {
             if !self.key_encode {
                 return Err(JsValue::from("Key op not supported"));
             }
@@ -600,7 +600,7 @@ impl CoseMessage {
                             .ok_or(JsValue::from("Missing algorithm"))?,
                     ) {
                         return Err(JsValue::from("Invalid Algorithm"));
-                    } else if self.agents[i].key_ops.len() > 0
+                    } else if !self.agents[i].key_ops.is_empty()
                         && !self.agents[i].key_ops.contains(&keys::KEY_OPS_SIGN)
                     {
                         return Err(JsValue::from("Key op not supported"));
@@ -622,7 +622,7 @@ impl CoseMessage {
                     if self.agents.len() > 1 {
                         return Err(JsValue::from("Only one recipient allowed for algorithm"));
                     }
-                    if self.agents[0].key_ops.len() > 0
+                    if !self.agents[0].key_ops.is_empty()
                         && !self.agents[0].key_ops.contains(&KO[self.context][0])
                     {
                         return Err(JsValue::from("Key op not supported"));
@@ -714,8 +714,8 @@ impl CoseMessage {
     }
 
     pub fn encode(&mut self, data: bool) -> Result<Vec<u8>, JsValue> {
-        if self.agents.len() <= 0 {
-            if self.secured.len() <= 0 {
+        if self.agents.is_empty() {
+            if self.secured.is_empty() {
                 return Err(JsValue::from(
                     "Missing ".to_owned() + MISS_ERR[self.context],
                 ));
@@ -812,7 +812,7 @@ impl CoseMessage {
                 }
             },
         }
-        if self.ph_bstr.len() > 0 {
+        if !self.ph_bstr.is_empty() {
             self.header.decode_protected_bstr(self.ph_bstr.clone())?;
         }
         self.header.decode_unprotected(&mut d, false)?;
@@ -836,8 +836,8 @@ impl CoseMessage {
             }
         };
 
-        if (self.context == ENC && self.secured.len() <= 0)
-            || (self.context != ENC && self.payload.len() <= 0)
+        if (self.context == ENC && self.secured.is_empty())
+            || (self.context != ENC && self.payload.is_empty())
         {
             if self.context == ENC {
                 return Err(JsValue::from("Missing Ciphertext"));
@@ -848,7 +848,7 @@ impl CoseMessage {
 
         if self.context != SIG {
             if self.header.alg.ok_or(JsValue::from("Missing algorithm"))? == algs::DIRECT
-                && self.ph_bstr.len() > 0
+                && !self.ph_bstr.is_empty()
             {
                 return Err(JsValue::from("Invalid COSE structure"));
             } else if algs::A_KW.contains(
@@ -856,7 +856,7 @@ impl CoseMessage {
                     .alg
                     .as_ref()
                     .ok_or(JsValue::from("Missing algorithm"))?,
-            ) && self.ph_bstr.len() > 0
+            ) && !self.ph_bstr.is_empty()
             {
                 return Err(JsValue::from("Invalid COSE structure"));
             }
@@ -864,7 +864,7 @@ impl CoseMessage {
 
         if self.context == MAC {
             self.secured = d.bytes()?.to_vec();
-            if self.secured.len() <= 0 {
+            if self.secured.is_empty() {
                 return Err(JsValue::from("Missing payload"));
             }
         }
@@ -919,7 +919,7 @@ impl CoseMessage {
                         return Err(JsValue::from("Invalid COSE tag"));
                     }
                 }
-                if self.secured.len() <= 0 {
+                if self.secured.is_empty() {
                     return Err(JsValue::from(
                         "Missing ".to_owned() + MISS_ERR[self.context],
                     ));
@@ -938,7 +938,7 @@ impl CoseMessage {
             None => Vec::new(),
             Some(v) => v,
         };
-        if self.agents.len() <= 0 {
+        if self.agents.is_empty() {
             if !self.key_decode {
                 return Err(JsValue::from("Key op not supported"));
             } else {
@@ -999,8 +999,8 @@ impl CoseMessage {
         } else if agent != None {
             let index = agent.ok_or(JsValue::from("Missing Agent"))?;
             if self.context == SIG {
-                if self.agents[index].pub_key.len() == 0
-                    || (self.agents[index].key_ops.len() > 0
+                if self.agents[index].pub_key.is_empty()
+                    || (!self.agents[index].key_ops.is_empty()
                         && !self.agents[index].key_ops.contains(&keys::KEY_OPS_VERIFY))
                 {
                     Err(JsValue::from("Key Op not supported"))
@@ -1020,12 +1020,12 @@ impl CoseMessage {
                         .alg
                         .ok_or(JsValue::from("Missing algorithm"))?
                 {
-                    if self.agents[index].key_ops.len() > 0
+                    if !self.agents[index].key_ops.is_empty()
                         && !self.agents[index].key_ops.contains(&KO[self.context][1])
                     {
                         return Err(JsValue::from("Key op not supported"));
                     } else {
-                        if self.agents[index].s_key.len() > 0 {
+                        if !self.agents[index].s_key.is_empty() {
                             cek = self.agents[index].s_key.clone();
                         } else {
                             return Err(JsValue::from("Key op not supported"));

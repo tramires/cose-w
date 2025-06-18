@@ -751,7 +751,6 @@ mod test_vecs {
 
     #[wasm_bindgen_test]
     fn prod_c41() {
-        let kid = b"11".to_vec();
         let payload = b"This is the content.".to_vec();
         let mut enc = CoseMessage::new_encrypt();
         enc.set_payload(payload);
@@ -794,7 +793,6 @@ mod test_vecs {
 
     #[wasm_bindgen_test]
     fn prod_c42() {
-        let kid = b"11".to_vec();
         let payload = b"This is the content.".to_vec();
         let mut sign = CoseMessage::new_encrypt();
         sign.set_payload(payload);
@@ -1037,7 +1035,6 @@ mod test_vecs {
 
     #[wasm_bindgen_test]
     fn prod_c61() {
-        let kid = b"11".to_vec();
         let payload = b"This is the content.".to_vec();
         let mut mac = CoseMessage::new_mac();
         mac.set_payload(payload);
@@ -1105,7 +1102,7 @@ mod test_vecs {
         let mut expected = RSA_PSS_01_BYTES.to_vec();
 
         // Remove probabilistic
-        let mut prob = vec![
+        let prob = vec![
             58, 212, 2, 112, 116, 152, 153, 149, 242, 94, 22, 127, 153, 201, 180, 9, 111, 220, 92,
             36, 45, 67, 141, 48, 56, 42, 231, 179, 15, 131, 200, 141, 91, 94, 190, 203, 100, 210,
             37, 109, 88, 211, 204, 229, 196, 125, 52, 59, 250, 83, 43, 17, 124, 45, 4, 223, 63,
@@ -1121,7 +1118,7 @@ mod test_vecs {
             163, 30, 111, 35, 29, 179, 214, 154, 122, 67, 42, 163, 214, 250, 29, 239, 156, 150, 89,
             97, 107, 235, 98, 111, 21, 131, 120, 224, 251, 221,
         ];
-        let mut index = expected
+        let index = expected
             .windows(prob.len())
             .position(|window| window == &prob)
             .unwrap();

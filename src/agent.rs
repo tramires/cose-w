@@ -91,7 +91,7 @@ impl CoseAgent {
         alg: &i32,
         iv: &Vec<u8>,
     ) -> Result<Vec<u8>, JsValue> {
-        if self.key_ops.len() > 0 && !self.key_ops.contains(&keys::KEY_OPS_ENCRYPT) {
+        if !self.key_ops.is_empty() && !self.key_ops.contains(&keys::KEY_OPS_ENCRYPT) {
             return Err(JsValue::from("Missing Key key_ops_encrypt"));
         }
         Ok(cose_struct::gen_cipher(
@@ -110,7 +110,7 @@ impl CoseAgent {
         external_aad: &Vec<u8>,
         body_protected: &Vec<u8>,
     ) -> Result<(), JsValue> {
-        if self.key_ops.len() > 0 && !self.key_ops.contains(&keys::KEY_OPS_SIGN) {
+        if !self.key_ops.is_empty() && !self.key_ops.contains(&keys::KEY_OPS_SIGN) {
             return Err(JsValue::from("Missing Key key_ops_sign"));
         }
         self.ph_bstr = self.header.get_protected_bstr(false)?;
@@ -132,7 +132,7 @@ impl CoseAgent {
         external_aad: &Vec<u8>,
         body_protected: &Vec<u8>,
     ) -> Result<bool, JsValue> {
-        if self.key_ops.len() > 0 && !self.key_ops.contains(&keys::KEY_OPS_VERIFY) {
+        if !self.key_ops.is_empty() && !self.key_ops.contains(&keys::KEY_OPS_VERIFY) {
             return Err(JsValue::from("Missing Key key_ops_verify"));
         }
         Ok(cose_struct::verify_sig(
@@ -147,26 +147,6 @@ impl CoseAgent {
             &self.payload,
         )?)
     }
-    pub(crate) fn mac(
-        &mut self,
-        content: &Vec<u8>,
-        external_aad: &Vec<u8>,
-        body_protected: &Vec<u8>,
-        alg: &i32,
-    ) -> Result<Vec<u8>, JsValue> {
-        if self.key_ops.len() > 0 && !self.key_ops.contains(&keys::KEY_OPS_MAC) {
-            return Err(JsValue::from("Key op not supported"));
-        }
-        self.ph_bstr = self.header.get_protected_bstr(false)?;
-        Ok(cose_struct::gen_mac(
-            &self.s_key,
-            &alg,
-            &external_aad,
-            &self.context,
-            &body_protected,
-            &content,
-        )?)
-    }
     pub(crate) fn derive_key(
         &mut self,
         cek: &Vec<u8>,
@@ -174,14 +154,16 @@ impl CoseAgent {
         sender: bool,
         true_alg: &i32,
     ) -> Result<Vec<u8>, JsValue> {
-        if self.ph_bstr.len() <= 0 {
+        if self.ph_bstr.is_empty() {
             self.ph_bstr = self.header.get_protected_bstr(false)?;
         }
+
         let alg = self
             .header
             .alg
             .as_ref()
             .ok_or(JsValue::from("Missing algorithm"))?;
+
         if algs::A_KW.contains(alg) {
             if sender {
                 self.payload = algs::aes_key_wrap(&self.s_key, *alg, &cek)?;
@@ -196,28 +178,7 @@ impl CoseAgent {
                 return Ok(algs::rsa_oaep_dec(&self.s_key, size, &cek, alg)?);
             }
             return Ok(cek.to_vec());
-        } else if algs::D_HA.contains(alg) {
-            let mut kdf_context = cose_struct::gen_kdf(
-                true_alg,
-                &self.header.party_u_identity,
-                &self.header.party_u_nonce,
-                &self.header.party_u_other,
-                &self.header.party_v_identity,
-                &self.header.party_v_nonce,
-                &self.header.party_v_other,
-                size as u16 * 8,
-                &self.ph_bstr,
-                &self.header.pub_other,
-                &self.header.priv_info,
-            )?;
-            return Ok(algs::hkdf(
-                size,
-                &self.s_key,
-                self.header.salt.as_ref(),
-                &mut kdf_context,
-                self.header.alg.unwrap(),
-            )?);
-        } else if algs::D_HS.contains(alg) {
+        } else if algs::D_HA.contains(alg) || algs::D_HS.contains(alg) {
             let mut kdf_context = cose_struct::gen_kdf(
                 true_alg,
                 &self.header.party_u_identity,
@@ -241,7 +202,7 @@ impl CoseAgent {
         } else if algs::ECDH_H.contains(alg) || algs::ECDH_A.contains(alg) {
             let (receiver_key, sender_key, crv_rec, crv_send);
             if sender {
-                if self.pub_key.len() == 0 {
+                if self.pub_key.is_empty() {
                     return Err(JsValue::from("Missing key"));
                 }
                 receiver_key = self.pub_key.clone();
@@ -249,7 +210,7 @@ impl CoseAgent {
                 crv_send = self.header.ecdh_key.crv.unwrap();
                 crv_rec = self.crv.unwrap();
             } else {
-                if self.s_key.len() == 0 {
+                if self.s_key.is_empty() {
                     return Err(JsValue::from("Missing key"));
                 }
                 receiver_key = self.header.ecdh_key.get_pub_key()?;
@@ -342,7 +303,7 @@ impl CoseAgent {
         )
     }
     pub(crate) fn decode(&mut self, d: &mut Decoder) -> Result<(), JsValue> {
-        if self.ph_bstr.len() > 0 {
+        if !self.ph_bstr.is_empty() {
             self.header.decode_protected_bstr(self.ph_bstr.clone())?;
         }
         self.header
@@ -364,8 +325,8 @@ impl CoseAgent {
             if !keys::ECDH_KTY.contains(key.kty.as_ref().ok_or(JsValue::from("Missing KTY"))?) {
                 return Err(JsValue::from("Invalid KTY"));
             }
-            if key.alg != None {
-                if key.alg.ok_or(JsValue::from("Missing algorithm"))? != alg {
+            if key.alg.is_some() {
+                if key.alg.unwrap() != alg {
                     return Err(JsValue::from("Algorithms dont match"));
                 }
             }
@@ -383,7 +344,7 @@ impl CoseAgent {
             if key.key_ops.contains(&keys::KEY_OPS_VERIFY) {
                 self.pub_key = key.get_pub_key()?;
             }
-            if key.key_ops.len() == 0 {
+            if key.key_ops.is_empty() {
                 self.s_key = match key.get_s_key() {
                     Ok(v) => v,
                     Err(_) => Vec::new(),
@@ -397,14 +358,14 @@ impl CoseAgent {
             if KEY_OPS_SKEY.iter().any(|i| key.key_ops.contains(i)) {
                 self.s_key = key.get_s_key()?;
             }
-            if key.key_ops.len() == 0 {
+            if key.key_ops.is_empty() {
                 self.s_key = match key.get_s_key() {
                     Ok(v) => v,
                     Err(_) => Vec::new(),
                 };
             }
             if algs::ECDH_ALGS.contains(&alg) || algs::OAEP_ALGS.contains(&alg) {
-                if key.key_ops.len() == 0 {
+                if key.key_ops.is_empty() {
                     self.pub_key = key.get_pub_key()?;
                 }
             }

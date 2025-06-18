@@ -1,4 +1,3 @@
-use crate::algs;
 use crate::cbor::{Decoder, Encoder, CBOR_FALSE, CBOR_TRUE};
 use crate::headers;
 use js_sys::{Array, Uint8Array};
@@ -337,10 +336,7 @@ impl CoseKey {
     pub fn other(&self) -> Option<Array> {
         match &self.other {
             Some(v) => Some(
-                self.other
-                    .as_ref()
-                    .unwrap()
-                    .into_iter()
+                v.into_iter()
                     .map(|primes| {
                         primes
                             .into_iter()
@@ -406,93 +402,100 @@ impl CoseKey {
     }
     pub(crate) fn verify_key_ops(&self) -> Result<(), JsValue> {
         let kty = self.kty.ok_or(JsValue::from("Missing KTY"))?;
-        if self.key_ops.len() > 0 {
-            if kty == EC2 || kty == OKP {
-                if self.key_ops.contains(&KEY_OPS_VERIFY)
-                    || self.key_ops.contains(&KEY_OPS_DERIVE)
-                    || self.key_ops.contains(&KEY_OPS_DERIVE_BITS)
-                {
-                    if self.x == None {
-                        return Err(JsValue::from("Missing X parameter"));
-                    } else if kty == EC2 && self.y.is_none() && self.y_parity.is_none() {
-                        return Err(JsValue::from("Missing Y parameter"));
-                    } else if self.crv == None {
-                        return Err(JsValue::from("Missing Curve"));
-                    }
-                }
-                if self.key_ops.contains(&KEY_OPS_SIGN) {
-                    if self.d == None {
-                        return Err(JsValue::from("Missing D parameter"));
-                    } else if self.crv == None {
-                        return Err(JsValue::from("Missing Curve"));
-                    }
-                }
-            } else if kty == SYMMETRIC {
-                if self.key_ops.contains(&KEY_OPS_ENCRYPT)
-                    || self.key_ops.contains(&KEY_OPS_MAC_VERIFY)
-                    || self.key_ops.contains(&KEY_OPS_MAC)
-                    || self.key_ops.contains(&KEY_OPS_DECRYPT)
-                    || self.key_ops.contains(&KEY_OPS_UNWRAP)
-                    || self.key_ops.contains(&KEY_OPS_WRAP)
-                {
-                    if self.x != None {
-                        return Err(JsValue::from("Invalid X value"));
-                    } else if self.y.is_some() || self.y_parity.is_some() {
-                        return Err(JsValue::from("Invalid Y value"));
-                    } else if self.d != None {
-                        return Err(JsValue::from("Invalid D value"));
-                    }
-                    if self.k == None {
-                        return Err(JsValue::from("Missing K value"));
-                    }
-                }
-            } else if kty == RSA {
-                if self.key_ops.contains(&KEY_OPS_VERIFY)
-                    || self.key_ops.contains(&KEY_OPS_DERIVE)
-                    || self.key_ops.contains(&KEY_OPS_DERIVE_BITS)
-                {
-                    if self.n.is_none() {
-                        return Err(JsValue::from("Missing N parmater"));
-                    } else if self.e.is_none() {
-                        return Err(JsValue::from("Missing E parmater"));
-                    } else if [
-                        &self.rsa_d,
-                        &self.p,
-                        &self.q,
-                        &self.dp,
-                        &self.dq,
-                        &self.qinv,
-                    ]
-                    .iter()
-                    .any(|v| v.is_some())
-                        || self.other.is_some()
+        if !self.key_ops.is_empty() {
+            match kty {
+                EC2 | OKP => {
+                    if self.key_ops.contains(&KEY_OPS_VERIFY)
+                        || self.key_ops.contains(&KEY_OPS_DERIVE)
+                        || self.key_ops.contains(&KEY_OPS_DERIVE_BITS)
                     {
-                        return Err(JsValue::from("Invalid params for RSA public key"));
+                        if self.x == None {
+                            return Err(JsValue::from("Missing X parameter"));
+                        } else if kty == EC2 && self.y.is_none() && self.y_parity.is_none() {
+                            return Err(JsValue::from("Missing Y parameter"));
+                        } else if self.crv == None {
+                            return Err(JsValue::from("Missing Curve"));
+                        }
+                    }
+                    if self.key_ops.contains(&KEY_OPS_SIGN) {
+                        if self.d == None {
+                            return Err(JsValue::from("Missing D parameter"));
+                        } else if self.crv == None {
+                            return Err(JsValue::from("Missing Curve"));
+                        }
                     }
                 }
-                if self.key_ops.contains(&KEY_OPS_SIGN) {
-                    if [
-                        &self.n,
-                        &self.e,
-                        &self.rsa_d,
-                        &self.p,
-                        &self.q,
-                        &self.dp,
-                        &self.dq,
-                        &self.qinv,
-                    ]
-                    .iter()
-                    .any(|v| v.is_none())
+                SYMMETRIC => {
+                    if self.key_ops.contains(&KEY_OPS_ENCRYPT)
+                        || self.key_ops.contains(&KEY_OPS_MAC_VERIFY)
+                        || self.key_ops.contains(&KEY_OPS_MAC)
+                        || self.key_ops.contains(&KEY_OPS_DECRYPT)
+                        || self.key_ops.contains(&KEY_OPS_UNWRAP)
+                        || self.key_ops.contains(&KEY_OPS_WRAP)
                     {
-                        return Err(JsValue::from("Missing RSA params"));
+                        if self.x != None {
+                            return Err(JsValue::from("Invalid X value"));
+                        } else if self.y.is_some() || self.y_parity.is_some() {
+                            return Err(JsValue::from("Invalid Y value"));
+                        } else if self.d != None {
+                            return Err(JsValue::from("Invalid D value"));
+                        }
+                        if self.k == None {
+                            return Err(JsValue::from("Missing K value"));
+                        }
                     }
-                    if self.other.is_some() {
-                        for primes in self.other.as_ref().unwrap() {
-                            if primes.len() != 3 {
-                                return Err(JsValue::from("Invalid 'Other' params"));
+                }
+                RSA => {
+                    if self.key_ops.contains(&KEY_OPS_VERIFY)
+                        || self.key_ops.contains(&KEY_OPS_DERIVE)
+                        || self.key_ops.contains(&KEY_OPS_DERIVE_BITS)
+                    {
+                        if self.n.is_none() {
+                            return Err(JsValue::from("Missing N parmater"));
+                        } else if self.e.is_none() {
+                            return Err(JsValue::from("Missing E parmater"));
+                        } else if [
+                            &self.rsa_d,
+                            &self.p,
+                            &self.q,
+                            &self.dp,
+                            &self.dq,
+                            &self.qinv,
+                        ]
+                        .iter()
+                        .any(|v| v.is_some())
+                            || self.other.is_some()
+                        {
+                            return Err(JsValue::from("Invalid params for RSA public key"));
+                        }
+                    }
+                    if self.key_ops.contains(&KEY_OPS_SIGN) {
+                        if [
+                            &self.n,
+                            &self.e,
+                            &self.rsa_d,
+                            &self.p,
+                            &self.q,
+                            &self.dp,
+                            &self.dq,
+                            &self.qinv,
+                        ]
+                        .iter()
+                        .any(|v| v.is_none())
+                        {
+                            return Err(JsValue::from("Missing RSA params"));
+                        }
+                        if self.other.is_some() {
+                            for primes in self.other.as_ref().unwrap() {
+                                if primes.len() != 3 {
+                                    return Err(JsValue::from("Invalid 'Other' params"));
+                                }
                             }
                         }
                     }
+                }
+                _ => {
+                    return Err(JsValue::from("Invalid KTY"));
                 }
             }
         }
@@ -505,116 +508,120 @@ impl CoseKey {
         for i in &self.used {
             e.signed(*i);
 
-            if *i == KTY {
-                e.signed(kty);
-            } else if *i == KEY_OPS {
-                e.array(self.key_ops.len());
-                for x in &self.key_ops {
-                    e.signed(*x);
+            match *i {
+                KTY => {
+                    e.signed(kty);
                 }
-            } else if *i == CRV_K {
-                if self.crv != None {
-                    e.signed(self.crv.ok_or(JsValue::from("Missing Curve"))?)
-                } else if self.kty.ok_or(JsValue::from("Missing KTY"))? == RSA {
-                    e.bytes(
-                        &self
-                            .n
-                            .as_ref()
-                            .ok_or(JsValue::from("Missing N parameter"))?,
-                    )
-                } else {
-                    e.bytes(
-                        &self
-                            .k
-                            .as_ref()
-                            .ok_or(JsValue::from("Missing K parameter"))?,
-                    )
+                KEY_OPS => {
+                    e.array(self.key_ops.len());
+                    for x in &self.key_ops {
+                        e.signed(*x);
+                    }
                 }
-            } else if *i == KID {
-                e.bytes(&self.kid.as_ref().ok_or(JsValue::from("Missing KID"))?)
-            } else if *i == ALG {
-                e.signed(self.alg.ok_or(JsValue::from("Missing Algorithm"))?)
-            } else if *i == BASE_IV {
-                e.bytes(
+                CRV_K => {
+                    if self.crv != None {
+                        e.signed(self.crv.ok_or(JsValue::from("Missing Curve"))?)
+                    } else if self.kty.ok_or(JsValue::from("Missing KTY"))? == RSA {
+                        e.bytes(
+                            &self
+                                .n
+                                .as_ref()
+                                .ok_or(JsValue::from("Missing N parameter"))?,
+                        )
+                    } else {
+                        e.bytes(
+                            &self
+                                .k
+                                .as_ref()
+                                .ok_or(JsValue::from("Missing K parameter"))?,
+                        )
+                    }
+                }
+                KID => e.bytes(&self.kid.as_ref().ok_or(JsValue::from("Missing KID"))?),
+                ALG => e.signed(self.alg.ok_or(JsValue::from("Missing Algorithm"))?),
+                BASE_IV => e.bytes(
                     &self
                         .base_iv
                         .as_ref()
                         .ok_or(JsValue::from("Missing Base IV"))?,
-                )
-            } else if *i == X {
-                if self.kty.ok_or(JsValue::from("Missing KTY"))? == RSA {
-                    e.bytes(
-                        &self
-                            .e
-                            .as_ref()
-                            .ok_or(JsValue::from("Missing E parameter"))?,
-                    )
-                } else {
-                    e.bytes(
-                        &self
-                            .x
-                            .as_ref()
-                            .ok_or(JsValue::from("Missing X parameter"))?,
-                    )
-                }
-            } else if *i == Y {
-                if self.kty.ok_or(JsValue::from("Missing KTY"))? == RSA {
-                    e.bytes(
-                        &self
-                            .rsa_d
-                            .as_ref()
-                            .ok_or(JsValue::from("Missing D parameter"))?,
-                    )
-                } else {
-                    if self.y_parity.is_none() {
+                ),
+                X => {
+                    if self.kty.ok_or(JsValue::from("Missing KTY"))? == RSA {
                         e.bytes(
                             &self
-                                .y
+                                .e
                                 .as_ref()
-                                .ok_or(JsValue::from("Missing Y parameter"))?,
+                                .ok_or(JsValue::from("Missing E parameter"))?,
                         )
                     } else {
-                        e.bool(self.y_parity.ok_or(JsValue::from("Missing Y parameters"))?)
+                        e.bytes(
+                            &self
+                                .x
+                                .as_ref()
+                                .ok_or(JsValue::from("Missing X parameter"))?,
+                        )
                     }
                 }
-            } else if *i == D {
-                if self.kty.ok_or(JsValue::from("Missing KTY"))? == RSA {
-                    e.bytes(
-                        &self
-                            .p
-                            .as_ref()
-                            .ok_or(JsValue::from("Missing P parameter"))?,
-                    )
-                } else {
-                    e.bytes(
-                        &self
-                            .d
-                            .as_ref()
-                            .ok_or(JsValue::from("Missing D parameter"))?,
-                    )
+                Y => {
+                    if self.kty.ok_or(JsValue::from("Missing KTY"))? == RSA {
+                        e.bytes(
+                            &self
+                                .rsa_d
+                                .as_ref()
+                                .ok_or(JsValue::from("Missing D parameter"))?,
+                        )
+                    } else {
+                        if self.y_parity.is_none() {
+                            e.bytes(
+                                &self
+                                    .y
+                                    .as_ref()
+                                    .ok_or(JsValue::from("Missing Y parameter"))?,
+                            )
+                        } else {
+                            e.bool(self.y_parity.ok_or(JsValue::from("Missing Y parameters"))?)
+                        }
+                    }
                 }
-            } else if *i == Q {
-                e.bytes(&self.q.as_ref().ok_or(JsValue::from("MissingQ"))?)
-            } else if *i == DP {
-                e.bytes(&self.dp.as_ref().ok_or(JsValue::from("MissingDP"))?)
-            } else if *i == DQ {
-                e.bytes(&self.dq.as_ref().ok_or(JsValue::from("MissingDQ"))?)
-            } else if *i == QINV {
-                e.bytes(&self.qinv.as_ref().ok_or(JsValue::from("MissingQINV"))?);
-            } else if *i == OTHER {
-                let other = self.other.as_ref().ok_or(JsValue::from("MissingOther"))?;
-                e.array(other.len());
-                for v in other {
-                    e.object(3);
-                    e.signed(RI);
-                    e.bytes(&v[0]);
-                    e.signed(DI);
-                    e.bytes(&v[1]);
-                    e.signed(TI);
-                    e.bytes(&v[2]);
+                D => {
+                    if self.kty.ok_or(JsValue::from("Missing KTY"))? == RSA {
+                        e.bytes(
+                            &self
+                                .p
+                                .as_ref()
+                                .ok_or(JsValue::from("Missing P parameter"))?,
+                        )
+                    } else {
+                        e.bytes(
+                            &self
+                                .d
+                                .as_ref()
+                                .ok_or(JsValue::from("Missing D parameter"))?,
+                        )
+                    }
                 }
-            } else {
-                return Err(("Duplicate Label ".to_owned() + &i.to_string()).into());
+                Q => e.bytes(&self.q.as_ref().ok_or(JsValue::from("MissingQ"))?),
+                DP => e.bytes(&self.dp.as_ref().ok_or(JsValue::from("MissingDP"))?),
+                DQ => e.bytes(&self.dq.as_ref().ok_or(JsValue::from("MissingDQ"))?),
+                QINV => {
+                    e.bytes(&self.qinv.as_ref().ok_or(JsValue::from("MissingQINV"))?);
+                }
+                OTHER => {
+                    let other = self.other.as_ref().ok_or(JsValue::from("MissingOther"))?;
+                    e.array(other.len());
+                    for v in other {
+                        e.object(3);
+                        e.signed(RI);
+                        e.bytes(&v[0]);
+                        e.signed(DI);
+                        e.bytes(&v[1]);
+                        e.signed(TI);
+                        e.bytes(&v[2]);
+                    }
+                }
+                _ => {
+                    return Err(("Duplicate Label ".to_owned() + &i.to_string()).into());
+                }
             }
         }
         Ok(())
@@ -643,131 +650,147 @@ impl CoseKey {
             } else {
                 return Err(("Duplicate Label ".to_owned() + &label.to_string()).into());
             }
-            if label == KTY {
-                self.kty = match d.text() {
-                    Ok(value) => Some(headers::get_kty_id(value)?),
-                    Err(_) => match d.signed() {
-                        Ok(v) => Some(v),
-                        Err(_) => {
-                            return Err(JsValue::from("Invalid COSE Structure"));
-                        }
-                    },
-                };
-                self.used.push(label);
-            } else if label == ALG {
-                self.alg = match d.text() {
-                    Ok(value) => Some(headers::get_alg_id(value)?),
-                    Err(_) => match d.signed() {
-                        Ok(v) => Some(v),
-                        Err(_) => {
-                            return Err(JsValue::from("Invalid COSE Structure"));
-                        }
-                    },
-                };
-                self.used.push(label);
-            } else if label == KID {
-                self.kid = Some(d.bytes()?);
-                self.used.push(label);
-            } else if label == KEY_OPS {
-                let mut key_ops = Vec::new();
-                for _i in 0..d.array()? {
-                    match d.text() {
-                        Ok(value) => {
-                            key_ops.push(headers::get_key_op_id(value)?);
-                        }
+            match label {
+                KTY => {
+                    self.kty = match d.text() {
+                        Ok(value) => Some(headers::get_kty_id(value)?),
                         Err(_) => match d.signed() {
-                            Ok(v) => {
-                                key_ops.push(v);
-                            }
+                            Ok(v) => Some(v),
                             Err(_) => {
                                 return Err(JsValue::from("Invalid COSE Structure"));
                             }
                         },
-                    }
+                    };
+                    self.used.push(label);
                 }
-                self.key_ops = key_ops;
-                self.used.push(label);
-            } else if label == BASE_IV {
-                self.base_iv = Some(d.bytes()?);
-                self.used.push(label);
-            } else if label == CRV_K {
-                match d.bytes() {
-                    Ok(v) => self.k = Some(v),
-                    Err(_) => {
-                        self.crv = match d.text() {
-                            Ok(value) => Some(headers::get_crv_id(value)?),
+                ALG => {
+                    self.alg = match d.text() {
+                        Ok(value) => Some(headers::get_alg_id(value)?),
+                        Err(_) => match d.signed() {
+                            Ok(v) => Some(v),
+                            Err(_) => {
+                                return Err(JsValue::from("Invalid COSE Structure"));
+                            }
+                        },
+                    };
+                    self.used.push(label);
+                }
+                KID => {
+                    self.kid = Some(d.bytes()?);
+                    self.used.push(label);
+                }
+                KEY_OPS => {
+                    let mut key_ops = Vec::new();
+                    for _i in 0..d.array()? {
+                        match d.text() {
+                            Ok(value) => {
+                                key_ops.push(headers::get_key_op_id(value)?);
+                            }
                             Err(_) => match d.signed() {
-                                Ok(v) => Some(v),
+                                Ok(v) => {
+                                    key_ops.push(v);
+                                }
                                 Err(_) => {
                                     return Err(JsValue::from("Invalid COSE Structure"));
                                 }
                             },
-                        };
-                    }
-                };
-                self.used.push(label);
-            } else if label == X {
-                self.x = Some(d.bytes()?);
-                self.used.push(label);
-            } else if label == Y {
-                self.y = match d.bytes() {
-                    Ok(value) => {
-                        self.used.push(label);
-                        Some(value)
-                    }
-                    Err(err) => {
-                        if err == CBOR_FALSE || err == CBOR_TRUE {
-                            self.y_parity = Some(d.bool()?);
-                            None
-                        } else {
-                            return Err(JsValue::from("Invalid Y parameter"));
                         }
                     }
-                };
-            } else if label == D {
-                self.d = Some(d.bytes()?);
-                self.used.push(label);
-            } else if label == Q {
-                self.q = Some(d.bytes()?);
-                self.used.push(label);
-            } else if label == DP {
-                self.dp = Some(d.bytes()?);
-                self.used.push(label);
-            } else if label == DQ {
-                self.dq = Some(d.bytes()?);
-                self.used.push(label);
-            } else if label == QINV {
-                self.qinv = Some(d.bytes()?);
-                self.used.push(label);
-            } else if label == OTHER {
-                let mut other = Vec::new();
-                for _ in 0..d.array()? {
-                    if d.object()? != 3 {
-                        return Err(JsValue::from("Invalid 'Other' structure"));
-                    }
-                    let mut ri = Vec::new();
-                    let mut di = Vec::new();
-                    let mut ti = Vec::new();
-                    for _ in 0..3 {
-                        let other_label = d.signed()?;
-                        if other_label == RI {
-                            ri = d.bytes()?;
-                        } else if other_label == DI {
-                            di = d.bytes()?;
-                        } else if other_label == TI {
-                            ti = d.bytes()?;
-                        } else {
-                            return Err(JsValue::from("Invalid 'Other' prime label"));
-                        }
-                    }
-                    other.push([ri, di, ti].to_vec());
+                    self.key_ops = key_ops;
+                    self.used.push(label);
                 }
-                self.other = Some(other);
-                self.used.push(label);
-            } else {
-                return Err(JsValue::from(
-                    "Invalid Label ".to_owned() + &label.to_string(),
-                ));
+                BASE_IV => {
+                    self.base_iv = Some(d.bytes()?);
+                    self.used.push(label);
+                }
+                CRV_K => {
+                    match d.bytes() {
+                        Ok(v) => self.k = Some(v),
+                        Err(_) => {
+                            self.crv = match d.text() {
+                                Ok(value) => Some(headers::get_crv_id(value)?),
+                                Err(_) => match d.signed() {
+                                    Ok(v) => Some(v),
+                                    Err(_) => {
+                                        return Err(JsValue::from("Invalid COSE Structure"));
+                                    }
+                                },
+                            };
+                        }
+                    };
+                    self.used.push(label);
+                }
+                X => {
+                    self.x = Some(d.bytes()?);
+                    self.used.push(label);
+                }
+                Y => {
+                    self.y = match d.bytes() {
+                        Ok(value) => {
+                            self.used.push(label);
+                            Some(value)
+                        }
+                        Err(err) => {
+                            if err == CBOR_FALSE || err == CBOR_TRUE {
+                                self.y_parity = Some(d.bool()?);
+                                None
+                            } else {
+                                return Err(JsValue::from("Invalid Y parameter"));
+                            }
+                        }
+                    };
+                }
+                D => {
+                    self.d = Some(d.bytes()?);
+                    self.used.push(label);
+                }
+                Q => {
+                    self.q = Some(d.bytes()?);
+                    self.used.push(label);
+                }
+                DP => {
+                    self.dp = Some(d.bytes()?);
+                    self.used.push(label);
+                }
+                DQ => {
+                    self.dq = Some(d.bytes()?);
+                    self.used.push(label);
+                }
+                QINV => {
+                    self.qinv = Some(d.bytes()?);
+                    self.used.push(label);
+                }
+                OTHER => {
+                    let mut other = Vec::new();
+                    for _ in 0..d.array()? {
+                        if d.object()? != 3 {
+                            return Err(JsValue::from("Invalid 'Other' structure"));
+                        }
+                        let mut ri = Vec::new();
+                        let mut di = Vec::new();
+                        let mut ti = Vec::new();
+                        for _ in 0..3 {
+                            let other_label = d.signed()?;
+                            if other_label == RI {
+                                ri = d.bytes()?;
+                            } else if other_label == DI {
+                                di = d.bytes()?;
+                            } else if other_label == TI {
+                                ti = d.bytes()?;
+                            } else {
+                                return Err(JsValue::from("Invalid 'Other' prime label"));
+                            }
+                        }
+                        other.push([ri, di, ti].to_vec());
+                    }
+                    self.other = Some(other);
+                    self.used.push(label);
+                }
+                _ => {
+                    return Err(JsValue::from(
+                        "Invalid Label ".to_owned() + &label.to_string(),
+                    ));
+                }
             }
         }
         if self.kty.ok_or(JsValue::from("Missing KTY"))? == RSA {
@@ -790,114 +813,119 @@ impl CoseKey {
 
     pub(crate) fn get_s_key(&self) -> Result<Vec<u8>, JsValue> {
         let kty = self.kty.ok_or(JsValue::from("MissingKTY"))?;
-        if kty == EC2 || kty == OKP {
-            let d = self
-                .d
-                .as_ref()
-                .ok_or(JsValue::from("MissingD())?.to_vec"))?
-                .clone();
-            if d.len() <= 0 {
-                return Err(JsValue::from("MissingD"));
-            }
-            Ok(d)
-        } else if kty == RSA {
-            use rsa::pkcs1::EncodeRsaPrivateKey;
-            let mut primes = vec![
-                BigUint::from_bytes_be(self.p.as_ref().ok_or(JsValue::from("Missing P"))?),
-                BigUint::from_bytes_be(self.q.as_ref().ok_or(JsValue::from("Missing Q"))?),
-            ];
-
-            if self.other.is_some() {
-                for prime in self.other.as_ref().unwrap() {
-                    primes.push(BigUint::from_bytes_be(&prime[0]));
+        match kty {
+            EC2 | OKP => {
+                let d = self
+                    .d
+                    .as_ref()
+                    .ok_or(JsValue::from("MissingD())?.to_vec"))?
+                    .clone();
+                if d.is_empty() {
+                    return Err(JsValue::from("MissingD"));
                 }
-            };
+                Ok(d)
+            }
+            RSA => {
+                use rsa::pkcs1::EncodeRsaPrivateKey;
+                let mut primes = vec![
+                    BigUint::from_bytes_be(self.p.as_ref().ok_or(JsValue::from("Missing P"))?),
+                    BigUint::from_bytes_be(self.q.as_ref().ok_or(JsValue::from("Missing Q"))?),
+                ];
 
-            match RsaPrivateKey::from_components(
-                BigUint::from_bytes_be(self.n.as_ref().ok_or(JsValue::from("Missing N"))?),
-                BigUint::from_bytes_be(self.e.as_ref().ok_or(JsValue::from("Missing E"))?),
-                BigUint::from_bytes_be(self.rsa_d.as_ref().ok_or(JsValue::from("Missing D"))?),
-                primes,
-            ) {
-                Ok(v) => match v.to_pkcs1_der() {
-                    Ok(v2) => {
-                        return Ok(v2.to_bytes().to_vec());
+                if self.other.is_some() {
+                    for prime in self.other.as_ref().unwrap() {
+                        primes.push(BigUint::from_bytes_be(&prime[0]));
                     }
+                };
+
+                match RsaPrivateKey::from_components(
+                    BigUint::from_bytes_be(self.n.as_ref().ok_or(JsValue::from("Missing N"))?),
+                    BigUint::from_bytes_be(self.e.as_ref().ok_or(JsValue::from("Missing E"))?),
+                    BigUint::from_bytes_be(self.rsa_d.as_ref().ok_or(JsValue::from("Missing D"))?),
+                    primes,
+                ) {
+                    Ok(v) => match v.to_pkcs1_der() {
+                        Ok(v2) => {
+                            return Ok(v2.to_bytes().to_vec());
+                        }
+                        Err(_) => {
+                            return Err(JsValue::from("RSA Public Key error"));
+                        }
+                    },
                     Err(_) => {
                         return Err(JsValue::from("RSA Public Key error"));
                     }
-                },
-                Err(_) => {
-                    return Err(JsValue::from("RSA Public Key error"));
-                }
-            };
-        } else if kty == SYMMETRIC {
-            let k = self
-                .k
-                .as_ref()
-                .ok_or(JsValue::from("MissingK())?.to_vec"))?
-                .clone();
-            if k.len() <= 0 {
-                return Err(JsValue::from("MissingK"));
+                };
             }
-            Ok(k)
-        } else {
-            Err(JsValue::from("InvalidKTY"))
+            SYMMETRIC => {
+                let k = self
+                    .k
+                    .as_ref()
+                    .ok_or(JsValue::from("MissingK())?.to_vec"))?
+                    .clone();
+                if k.is_empty() {
+                    return Err(JsValue::from("MissingK"));
+                }
+                Ok(k)
+            }
+            _ => Err(JsValue::from("InvalidKTY")),
         }
     }
     pub(crate) fn get_pub_key(&self) -> Result<Vec<u8>, JsValue> {
         let kty = self.kty.ok_or(JsValue::from("MissingKTY"))?;
-        if kty == EC2 || kty == OKP {
-            let mut x = self
-                .x
-                .as_ref()
-                .ok_or(JsValue::from("MissingX())?.to_vec"))?
-                .clone();
-            if x.len() <= 0 {
-                return Err(JsValue::from("MissingX"));
-            }
-            let mut pub_key;
-            if kty == EC2 {
-                if self.y != None && self.y.as_ref().unwrap().len() > 0 {
-                    let mut y = self.y.as_ref().unwrap().to_vec();
-                    pub_key = vec![4];
-                    pub_key.append(&mut x);
-                    pub_key.append(&mut y);
-                } else {
-                    if self.y_parity.is_some() {
-                        if self.y_parity.unwrap() {
-                            pub_key = vec![3];
-                        } else {
-                            pub_key = vec![2];
-                        }
-                        pub_key.append(&mut x);
-                    } else {
-                        return Err(JsValue::from("MissingY"));
-                    }
+        match kty {
+            EC2 | OKP => {
+                let mut x = self
+                    .x
+                    .as_ref()
+                    .ok_or(JsValue::from("MissingX())?.to_vec"))?
+                    .clone();
+                if x.is_empty() {
+                    return Err(JsValue::from("MissingX"));
                 }
-            } else {
-                pub_key = x;
-            }
-            Ok(pub_key)
-        } else if kty == RSA {
-            match RsaPublicKey::new(
-                BigUint::from_bytes_be(self.n.as_ref().ok_or(JsValue::from("Missing N"))?),
-                BigUint::from_bytes_be(self.e.as_ref().ok_or(JsValue::from("Missing N"))?),
-            ) {
-                Ok(v) => match v.to_public_key_der() {
-                    Ok(v2) => {
-                        return Ok(v2.to_vec());
+                let mut pub_key;
+                if kty == EC2 {
+                    if self.y != None && !self.y.as_ref().unwrap().is_empty() {
+                        let mut y = self.y.as_ref().unwrap().to_vec();
+                        pub_key = vec![4];
+                        pub_key.append(&mut x);
+                        pub_key.append(&mut y);
+                    } else {
+                        if self.y_parity.is_some() {
+                            if self.y_parity.unwrap() {
+                                pub_key = vec![3];
+                            } else {
+                                pub_key = vec![2];
+                            }
+                            pub_key.append(&mut x);
+                        } else {
+                            return Err(JsValue::from("MissingY"));
+                        }
                     }
+                } else {
+                    pub_key = x;
+                }
+                Ok(pub_key)
+            }
+            RSA => {
+                match RsaPublicKey::new(
+                    BigUint::from_bytes_be(self.n.as_ref().ok_or(JsValue::from("Missing N"))?),
+                    BigUint::from_bytes_be(self.e.as_ref().ok_or(JsValue::from("Missing N"))?),
+                ) {
+                    Ok(v) => match v.to_public_key_der() {
+                        Ok(v2) => {
+                            return Ok(v2.to_vec());
+                        }
+                        Err(_) => {
+                            return Err(JsValue::from("RSA Public Key error"));
+                        }
+                    },
                     Err(_) => {
                         return Err(JsValue::from("RSA Public Key error"));
                     }
-                },
-                Err(_) => {
-                    return Err(JsValue::from("RSA Public Key error"));
-                }
-            };
-        } else {
-            Err(JsValue::from("InvalidKTY"))
+                };
+            }
+            _ => Err(JsValue::from("InvalidKTY")),
         }
     }
 }
