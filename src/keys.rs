@@ -870,10 +870,10 @@ impl CoseKey {
                         } else {
                             pub_key = vec![2];
                         }
+                        pub_key.append(&mut x);
                     } else {
                         return Err(JsValue::from("MissingY"));
                     }
-                    pub_key.append(&mut x);
                 }
             } else {
                 pub_key = x;
@@ -932,8 +932,8 @@ impl CoseKeySet {
         self.cose_keys.clone()
     }
 
-    pub fn add_key(&mut self, key: CoseKey) {
-        self.cose_keys.push(key);
+    pub fn add_key(&mut self, key: &CoseKey) {
+        self.cose_keys.push(key.clone());
     }
 
     pub fn encode(&mut self) -> Result<(), JsValue> {
