@@ -261,8 +261,9 @@ impl CoseMessage {
             return Err(JsValue::from("Invalid Operation for Context"));
         }
         cose_key.verify_kty()?;
-        if cose_key.alg.ok_or(JsValue::from("Missing Key alg"))?
-            != self.header.alg.ok_or(JsValue::from("Missing Header alg"))?
+        if cose_key.alg.is_some()
+            && cose_key.alg.unwrap()
+                != self.header.alg.ok_or(JsValue::from("Missing Header alg"))?
         {
             return Err(JsValue::from("Algorithms don't match"));
         }

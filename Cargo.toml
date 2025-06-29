@@ -20,6 +20,7 @@ name = "cose"
 
 [dev-dependencies]
 wasm-bindgen-test = "0.3.0"
+hex = "0.4.3"
 
 [dependencies]
 js-sys = "0.3.77"

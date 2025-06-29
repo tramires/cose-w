@@ -479,22 +479,16 @@ pub(crate) fn verify(
     Ok(v)
 }
 
-fn verify_mac_key(alg: i32, key: &Vec<u8>) -> Result<(), JsValue> {
+fn verify_mac_key(alg: i32, l: usize) -> Result<(), JsValue> {
     let size = match alg {
         AES_MAC_128_64 => 16,
         AES_MAC_256_64 => 32,
         AES_MAC_128_128 => 16,
         AES_MAC_256_128 => 32,
-        HMAC_256_64 => 8,
-        HMAC_256_256 => 32,
-        HMAC_384_384 => 48,
-        HMAC_512_512 => 64,
         _ => 0,
     };
 
-    if size == 0 {
-        Err(JsValue::from("Invalid algorithm"))
-    } else if key.len() != size {
+    if size != 0 && l != size {
         Err(JsValue::from("Invalid MAC key"))
     } else {
         Ok(())
@@ -503,7 +497,7 @@ fn verify_mac_key(alg: i32, key: &Vec<u8>) -> Result<(), JsValue> {
 pub(crate) fn mac(alg: i32, key: &Vec<u8>, content: &Vec<u8>) -> Result<Vec<u8>, JsValue> {
     let mut message_digest;
     let size;
-    verify_mac_key(alg, key)?;
+    verify_mac_key(alg, key.len())?;
     match alg {
         HMAC_256_64 => {
             let mut mac = match HmacSha256::new_from_slice(key.as_slice()) {
@@ -593,7 +587,7 @@ pub(crate) fn mac_verify(
 ) -> Result<bool, JsValue> {
     let mut message_digest;
     let size;
-    verify_mac_key(alg, key)?;
+    verify_mac_key(alg, key.len())?;
     match alg {
         HMAC_256_64 => {
             let mut mac = match HmacSha256::new_from_slice(key.as_slice()) {
@@ -1470,7 +1464,7 @@ pub(crate) fn gen_iv(
 }
 
 #[cfg(test)]
-mod test_vecs {
+mod unit_tests {
     use crate::algs;
     use crate::keys;
     use wasm_bindgen_test::*;
@@ -1606,7 +1600,12 @@ mod test_vecs {
     }
     #[wasm_bindgen_test]
     fn mac_invalid_key() {
-        for alg in algs::MAC_ALGS {
+        for alg in [
+            algs::AES_MAC_128_64,
+            algs::AES_MAC_256_64,
+            algs::AES_MAC_128_128,
+            algs::AES_MAC_256_128,
+        ] {
             let out_mac = algs::mac(alg, &vec![0], &vec![]);
             let out_verify = algs::mac_verify(alg, &vec![0], &vec![], &vec![]);
             assert!(out_mac.is_err());
@@ -1783,5 +1782,325 @@ mod test_vecs {
             algs::hkdf(0, &vec![], None, &mut vec![], algs::ES256),
             Err("Invalid algorithm".into())
         );
+    }
+}
+
+#[cfg(test)]
+mod vector_tests {
+    use crate::algs;
+    use wasm_bindgen_test::*;
+
+    #[wasm_bindgen_test]
+    fn deterministic_sign() {
+        let params_csv = include_str!("../test_params/deterministic_sign.csv");
+        let mut params: Vec<Vec<&str>> = Vec::new();
+        for line in params_csv.lines().skip(1) {
+            params.push(line.split(',').map(|s| s.trim()).collect());
+        }
+
+        assert!(!params.is_empty());
+        for i in 0..params.len() {
+            let alg = params[i][0].parse::<i32>().unwrap();
+            let crv = params[i][1].parse::<i32>().unwrap();
+            let s_key = hex::decode(params[i][2]).unwrap();
+            let p_key = hex::decode(params[i][3]).unwrap();
+            let wrong_p_key = hex::decode(params[i][4]).unwrap();
+            let msg = hex::decode(params[i][5]).unwrap();
+            let sig = hex::decode(params[i][6]).unwrap();
+
+            assert_eq!(algs::sign(alg, Some(crv), &s_key, &msg).unwrap(), sig);
+
+            // Remove message byte
+            let mut truncated_msg = msg.clone();
+            truncated_msg.pop();
+            assert_ne!(
+                algs::sign(alg, Some(crv), &s_key, &truncated_msg).unwrap(),
+                sig
+            );
+
+            // Flip message byte
+            let mut malformed_msg = msg.clone();
+            malformed_msg[0] ^= 0xFF;
+            assert_ne!(
+                algs::sign(alg, Some(crv), &s_key, &malformed_msg).unwrap(),
+                sig
+            );
+
+            assert!(algs::verify(alg, Some(crv), &p_key, &msg, &sig).unwrap());
+
+            // Remove signature byte
+            let mut truncated_sig = sig.clone();
+            truncated_sig.pop();
+            assert!(algs::verify(alg, Some(crv), &p_key, &msg, &truncated_sig).is_err());
+
+            // Flip signature byte
+            let mut malformed_sig = sig.clone();
+            malformed_sig[0] ^= 0xFF;
+            assert!(!algs::verify(alg, Some(crv), &p_key, &msg, &malformed_sig).unwrap());
+
+            // Wrong public keys
+            assert!(!algs::verify(alg, Some(crv), &wrong_p_key, &msg, &sig).unwrap());
+        }
+    }
+
+    #[wasm_bindgen_test]
+    fn probabilistic_verify() {
+        use rsa::pkcs8::EncodePublicKey;
+        use rsa::BigUint;
+        use rsa::RsaPublicKey;
+
+        let params_csv = include_str!("../test_params/probabilistic_verify.csv");
+        let mut params: Vec<Vec<&str>> = Vec::new();
+        for line in params_csv.lines().skip(1) {
+            params.push(line.split(',').map(|s| s.trim()).collect());
+        }
+
+        assert!(!params.is_empty());
+
+        for i in 0..params.len() {
+            let alg = params[i][0].parse::<i32>().unwrap();
+            let n = hex::decode(params[i][1]).unwrap();
+            let e = hex::decode(params[i][2]).unwrap();
+            let wrong_n = hex::decode(params[i][3]).unwrap();
+            let wrong_e = hex::decode(params[i][4]).unwrap();
+            let msg = hex::decode(params[i][5]).unwrap();
+            let sig = hex::decode(params[i][6]).unwrap();
+
+            let rsa_pub =
+                RsaPublicKey::new(BigUint::from_bytes_be(&n), BigUint::from_bytes_be(&e)).unwrap();
+            let p_key = rsa_pub.to_public_key_der().unwrap().to_vec();
+            assert!(algs::verify(alg, None, &p_key, &msg, &sig).unwrap());
+
+            // Remove signature byte
+            let mut truncated_sig = sig.clone();
+            truncated_sig.pop();
+            assert!(!algs::verify(alg, None, &p_key, &msg, &truncated_sig).unwrap());
+
+            // Flip signature byte
+            let mut malformed_sig = sig.clone();
+            malformed_sig[0] ^= 0xFF;
+            assert!(!algs::verify(alg, None, &p_key, &msg, &malformed_sig).unwrap());
+
+            // Wrong public keys
+            let wrong_rsa_pub = RsaPublicKey::new(
+                BigUint::from_bytes_be(&wrong_n),
+                BigUint::from_bytes_be(&wrong_e),
+            )
+            .unwrap();
+            let wrong_p_key = wrong_rsa_pub.to_public_key_der().unwrap().to_vec();
+            assert!(!algs::verify(alg, None, &wrong_p_key, &msg, &sig).unwrap());
+        }
+    }
+    #[wasm_bindgen_test]
+    fn probabilistic_sign() {
+        let params_csv = include_str!("../test_params/probabilistic_sign.csv");
+        let mut params: Vec<Vec<&str>> = Vec::new();
+        for line in params_csv.lines().skip(1) {
+            params.push(line.split(',').map(|s| s.trim()).collect());
+        }
+
+        assert!(!params.is_empty());
+
+        for alg in [algs::PS256, algs::PS384, algs::PS512] {
+            let signature =
+                algs::sign(alg, None, &hex::decode(params[0][0]).unwrap(), &vec![]).unwrap();
+
+            assert!(algs::verify(
+                alg,
+                None,
+                &hex::decode(params[0][1]).unwrap(),
+                &vec![],
+                &signature
+            )
+            .unwrap());
+            assert!(!algs::verify(
+                alg,
+                None,
+                &hex::decode(params[1][1]).unwrap(),
+                &vec![],
+                &signature
+            )
+            .unwrap());
+        }
+    }
+
+    #[wasm_bindgen_test]
+    fn mac() {
+        let params_csv = include_str!("../test_params/mac.csv");
+        let mut params: Vec<Vec<&str>> = Vec::new();
+        for line in params_csv.lines().skip(1) {
+            params.push(line.split(',').map(|s| s.trim()).collect());
+        }
+        assert!(!params.is_empty());
+
+        for i in 0..params.len() {
+            let alg = params[i][0].parse::<i32>().unwrap();
+            let size = params[i][1].parse::<usize>().unwrap();
+            let k = hex::decode(params[i][2]).unwrap();
+            let msg = hex::decode(params[i][3]).unwrap();
+            let mac = hex::decode(params[i][4]).unwrap();
+
+            assert_eq!(algs::mac(alg, &k, &msg).unwrap(), mac[0..size]);
+
+            // Add extra byte to msg
+            let mut altered_msg = msg.clone();
+            altered_msg.push(0);
+            assert_ne!(algs::mac(alg, &k, &altered_msg).unwrap(), mac[0..size]);
+
+            assert!(algs::mac_verify(alg, &k, &msg, &mac[0..size].to_vec()).unwrap());
+
+            // Flip mac byte
+            let mut malformed_mac = mac.clone();
+            malformed_mac[0] ^= 0xFF;
+            assert!(!algs::mac_verify(alg, &k, &msg, &malformed_mac[0..size].to_vec()).unwrap());
+
+            // Wrong key
+            let mut wrong_k = k.clone();
+            wrong_k[0] ^= 0xFF;
+            assert!(
+                !algs::mac_verify(alg, &wrong_k, &msg, &malformed_mac[0..size].to_vec()).unwrap()
+            );
+        }
+    }
+
+    #[wasm_bindgen_test]
+    fn encrypt() {
+        let params_csv = include_str!("../test_params/encrypt.csv");
+        let mut params: Vec<Vec<&str>> = Vec::new();
+        for line in params_csv.lines().skip(1) {
+            params.push(line.split(',').map(|s| s.trim()).collect());
+        }
+        assert!(!params.is_empty());
+
+        for i in 0..params.len() {
+            let alg = params[i][0].parse::<i32>().unwrap();
+            let k = hex::decode(params[i][1]).unwrap();
+            let nonce = hex::decode(params[i][2]).unwrap();
+            let aad = hex::decode(params[i][3]).unwrap();
+            let msg = hex::decode(params[i][4]).unwrap();
+            let enc = hex::decode(params[i][5]).unwrap();
+
+            assert_eq!(algs::encrypt(alg, &k, &nonce, &msg, &aad).unwrap(), enc);
+
+            // Add extra byte to msg
+            let mut altered_msg = msg.clone();
+            altered_msg.push(0);
+            assert_ne!(
+                algs::encrypt(alg, &k, &nonce, &altered_msg, &aad).unwrap(),
+                enc
+            );
+
+            if !aad.is_empty() {
+                // Flip aad byte
+                let mut altered_aad = aad.clone();
+                altered_aad[0] ^= 0xFF;
+                assert_ne!(
+                    algs::encrypt(alg, &k, &nonce, &msg, &altered_aad).unwrap(),
+                    enc
+                );
+            }
+
+            assert_eq!(algs::decrypt(alg, &k, &nonce, &enc, &aad).unwrap(), msg);
+
+            // Flip mac byte
+            let mut malformed_enc = enc.clone();
+            malformed_enc[0] ^= 0xFF;
+            assert!(algs::decrypt(alg, &k, &nonce, &malformed_enc, &aad).is_err());
+
+            // Wrong key
+            let mut wrong_k = k.clone();
+            wrong_k[0] ^= 0xFF;
+            assert!(algs::decrypt(alg, &wrong_k, &nonce, &enc, &aad).is_err(),);
+        }
+    }
+
+    #[wasm_bindgen_test]
+    fn ecdh() {
+        let params_csv = include_str!("../test_params/ecdh.csv");
+        let mut params: Vec<Vec<&str>> = Vec::new();
+        for line in params_csv.lines().skip(1) {
+            params.push(line.split(',').map(|s| s.trim()).collect());
+        }
+
+        assert!(!params.is_empty());
+
+        for i in 0..params.len() {
+            let crv = params[i][0].parse::<i32>().unwrap();
+            let send_key = hex::decode(params[i][1]).unwrap();
+            let rec_key = hex::decode(params[i][2]).unwrap();
+            let derived_key = hex::decode(params[i][3]).unwrap();
+            let wrong_send_key = hex::decode(params[i][4]).unwrap();
+            let wrong_rec_key = hex::decode(params[i][5]).unwrap();
+
+            assert_eq!(
+                algs::ecdh_derive_key(crv, crv, &rec_key, &send_key).unwrap(),
+                derived_key
+            );
+
+            // Wrong receiver key
+            assert_ne!(
+                algs::ecdh_derive_key(crv, crv, &wrong_rec_key, &send_key).unwrap(),
+                derived_key
+            );
+
+            // Wrong sender key
+            assert_ne!(
+                algs::ecdh_derive_key(crv, crv, &rec_key, &wrong_send_key).unwrap(),
+                derived_key
+            );
+
+            // Wrong keys
+            assert_ne!(
+                algs::ecdh_derive_key(crv, crv, &wrong_rec_key, &wrong_send_key).unwrap(),
+                derived_key
+            );
+        }
+    }
+    #[wasm_bindgen_test]
+    fn hkdf() {
+        let params_csv = include_str!("../test_params/hkdf.csv");
+        let mut params: Vec<Vec<&str>> = Vec::new();
+        for line in params_csv.lines().skip(1) {
+            params.push(line.split(',').map(|s| s.trim()).collect());
+        }
+        assert!(!params.is_empty());
+
+        for i in 0..params.len() {
+            let alg = params[i][0].parse::<i32>().unwrap();
+            let l = params[i][1].parse::<usize>().unwrap();
+            let ikm = hex::decode(params[i][2]).unwrap();
+            let salt = hex::decode(params[i][3]).unwrap();
+            let mut info = hex::decode(params[i][4]).unwrap();
+            let okm = hex::decode(params[i][5]).unwrap();
+
+            assert_eq!(
+                algs::hkdf(l, &ikm, Some(&salt), &mut info, alg).unwrap(),
+                okm
+            );
+
+            // Add extra byte to info
+            let mut altered_info = info.clone();
+            altered_info.push(0);
+            assert_ne!(
+                algs::hkdf(l, &ikm, Some(&salt), &mut altered_info, alg).unwrap(),
+                okm
+            );
+
+            // Add extra byte to salt
+            let mut altered_salt = salt.clone();
+            altered_salt.push(1);
+            assert_ne!(
+                algs::hkdf(l, &ikm, Some(&altered_salt), &mut info, alg).unwrap(),
+                okm
+            );
+
+            // Wrong ikm
+            let mut wrong_ikm = ikm.clone();
+            wrong_ikm[0] ^= 0xFF;
+            assert_ne!(
+                algs::hkdf(l, &wrong_ikm, Some(&salt), &mut info, alg).unwrap(),
+                okm
+            );
+        }
     }
 }

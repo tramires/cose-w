@@ -325,15 +325,14 @@ impl CoseAgent {
             if !keys::ECDH_KTY.contains(key.kty.as_ref().ok_or(JsValue::from("Missing KTY"))?) {
                 return Err(JsValue::from("Invalid KTY"));
             }
-            if key.alg.is_some() {
-                if key.alg.unwrap() != alg {
-                    return Err(JsValue::from("Algorithms dont match"));
-                }
+            if key.alg.is_some() && key.alg.unwrap() != alg {
+                return Err(JsValue::from("Algorithms dont match"));
             }
         } else if (alg != algs::DIRECT
             && !algs::A_KW.contains(&alg)
             && !algs::RSA_OAEP.contains(&alg))
-            && key.alg.ok_or(JsValue::from("Missing algorithm"))? != alg
+            && key.alg.is_some()
+            && key.alg.unwrap() != alg
         {
             return Err(JsValue::from("Algorithms dont match"));
         }

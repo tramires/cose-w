@@ -910,7 +910,7 @@ impl CoseKey {
             RSA => {
                 match RsaPublicKey::new(
                     BigUint::from_bytes_be(self.n.as_ref().ok_or(JsValue::from("Missing N"))?),
-                    BigUint::from_bytes_be(self.e.as_ref().ok_or(JsValue::from("Missing N"))?),
+                    BigUint::from_bytes_be(self.e.as_ref().ok_or(JsValue::from("Missing E"))?),
                 ) {
                     Ok(v) => match v.to_public_key_der() {
                         Ok(v2) => {

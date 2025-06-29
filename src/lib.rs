@@ -53,10 +53,10 @@ mod test_vecs {
         34, 245, 35, 88, 32, 2, 209, 247, 230, 242, 108, 67, 212, 134, 141, 135, 206, 178, 53, 49,
         97, 116, 10, 172, 241, 247, 22, 54, 71, 152, 75, 82, 42, 132, 141, 241, 195,
     ];
-    const OUR_SECRET: [u8; 52] = [
-        164, 1, 4, 2, 74, 111, 117, 114, 45, 115, 101, 99, 114, 101, 116, 32, 88, 32, 132, 155, 87,
+    const OUR_SECRET: [u8; 50] = [
+        163, 1, 4, 2, 74, 111, 117, 114, 45, 115, 101, 99, 114, 101, 116, 32, 88, 32, 132, 155, 87,
         33, 157, 174, 72, 222, 100, 109, 7, 219, 181, 51, 86, 110, 151, 102, 134, 69, 124, 20, 145,
-        190, 58, 118, 220, 234, 108, 66, 113, 136, 3, 15,
+        190, 58, 118, 220, 234, 108, 66, 113, 136,
     ];
     const OUR_SECRET2: [u8; 34] = [
         163, 1, 4, 2, 75, 111, 117, 114, 45, 115, 101, 99, 114, 101, 116, 50, 32, 80, 132, 155, 87,
@@ -350,7 +350,6 @@ mod test_vecs {
         let mut key = keys::CoseKey::new();
         key.set_bytes(ELEVEN.to_vec());
         key.decode().unwrap();
-        key.set_alg(Some(algs::ES256));
         verify.set_agent_key(i, &key).unwrap();
         verify.decode(None, Some(i)).unwrap();
     }
@@ -369,7 +368,6 @@ mod test_vecs {
         let mut key = keys::CoseKey::new();
         key.set_bytes(ELEVEN.to_vec());
         key.decode().unwrap();
-        key.set_alg(Some(algs::ES256));
 
         let mut agent = agent::CoseAgent::new();
         agent.set_header(header);
@@ -392,7 +390,6 @@ mod test_vecs {
         let mut key = keys::CoseKey::new();
         key.set_bytes(ELEVEN.to_vec());
         key.decode().unwrap();
-        key.set_alg(Some(algs::ES256));
         verify.set_agent_key(i, &key).unwrap();
         verify.decode(None, Some(i)).unwrap();
         // 2nd signer uses ES512 (Not Implemented)
@@ -409,7 +406,6 @@ mod test_vecs {
         let mut key = keys::CoseKey::new();
         key.set_bytes(ELEVEN.to_vec());
         key.decode().unwrap();
-        key.set_alg(Some(algs::ES256));
         verify.set_agent_key(i, &key).unwrap();
 
         verify.decode(None, Some(i)).unwrap();
@@ -433,7 +429,6 @@ mod test_vecs {
         let mut key = keys::CoseKey::new();
         key.set_bytes(ELEVEN.to_vec());
         key.decode().unwrap();
-        key.set_alg(Some(algs::ES256));
 
         let mut agent = agent::CoseAgent::new();
         agent.set_header(header);
@@ -451,7 +446,6 @@ mod test_vecs {
         let mut key = keys::CoseKey::new();
         key.set_bytes(ELEVEN.to_vec());
         key.decode().unwrap();
-        key.set_alg(Some(algs::ES256));
 
         counter.set_header(header);
         counter.key(&key).unwrap();
@@ -472,7 +466,6 @@ mod test_vecs {
         let mut key = keys::CoseKey::new();
         key.set_bytes(ELEVEN.to_vec());
         key.decode().unwrap();
-        key.set_alg(Some(algs::ES256));
 
         verify.key(&key).unwrap();
         verify.decode(None, None).unwrap();
@@ -493,7 +486,6 @@ mod test_vecs {
         let mut key = keys::CoseKey::new();
         key.set_bytes(ELEVEN.to_vec());
         key.decode().unwrap();
-        key.set_alg(Some(algs::ES256));
         sign.key(&key).unwrap();
 
         sign.secure_content(None).unwrap();
@@ -570,7 +562,6 @@ mod test_vecs {
         let mut key = keys::CoseKey::new();
         key.set_bytes(OUR_SECRET.to_vec());
         key.decode().unwrap();
-        key.set_alg(dec.agents[i].header.alg);
         dec.set_party_identity(i, b"lighting-client".to_vec(), true);
         dec.set_party_identity(i, b"lighting-server".to_vec(), false);
         dec.set_pub_other(i, b"Encryption Example 02".to_vec());
@@ -598,7 +589,6 @@ mod test_vecs {
         let mut key = keys::CoseKey::new();
         key.set_bytes(OUR_SECRET.to_vec());
         key.decode().unwrap();
-        key.set_alg(Some(algs::DIRECT_HKDF_SHA_256));
 
         let mut agent = agent::CoseAgent::new();
         header = headers::CoseHeader::new();
@@ -744,7 +734,6 @@ mod test_vecs {
         let mut key = keys::CoseKey::new();
         key.set_bytes(OUR_SECRET2.to_vec());
         key.decode().unwrap();
-        key.set_alg(dec.header.alg);
         dec.key(&key).unwrap();
         assert_eq!(dec.decode(None, None).unwrap(), msg);
     }
@@ -767,7 +756,6 @@ mod test_vecs {
         let mut key = keys::CoseKey::new();
         key.set_bytes(OUR_SECRET2.to_vec());
         key.decode().unwrap();
-        key.set_alg(Some(algs::AES_CCM_16_64_128));
 
         enc.key(&key).unwrap();
         enc.secure_content(None).unwrap();
@@ -786,7 +774,6 @@ mod test_vecs {
         key.set_bytes(OUR_SECRET2.to_vec());
         key.decode().unwrap();
         key.set_base_iv(Some(vec![137, 245, 47, 101, 161, 197, 128, 147]));
-        key.set_alg(dec.header.alg);
         dec.key(&key).unwrap();
         assert_eq!(dec.decode(None, None).unwrap(), msg);
     }
@@ -805,7 +792,6 @@ mod test_vecs {
         let mut key = keys::CoseKey::new();
         key.set_bytes(OUR_SECRET2.to_vec());
         key.decode().unwrap();
-        key.set_alg(Some(algs::AES_CCM_16_64_128));
         key.set_base_iv(Some(vec![137, 245, 47, 101, 161, 197, 128, 147]));
 
         sign.key(&key).unwrap();
@@ -824,7 +810,6 @@ mod test_vecs {
         let mut key = keys::CoseKey::new();
         key.set_bytes(OUR_SECRET.to_vec());
         key.decode().unwrap();
-        key.set_alg(Some(algs::AES_MAC_256_64));
         verify.set_agent_key(i, &key).unwrap();
         verify.decode(None, Some(i)).unwrap();
     }
@@ -847,7 +832,6 @@ mod test_vecs {
         let mut key = keys::CoseKey::new();
         key.set_bytes(OUR_SECRET.to_vec());
         key.decode().unwrap();
-        key.set_alg(Some(algs::AES_MAC_256_64));
 
         let mut agent = agent::CoseAgent::new();
         agent.set_header(header);
@@ -942,7 +926,6 @@ mod test_vecs {
         let mut key = keys::CoseKey::new();
         key.set_bytes(UID.to_vec());
         key.decode().unwrap();
-        key.set_alg(Some(algs::AES_MAC_128_64));
         verify.set_agent_key(i, &key).unwrap();
 
         verify.decode(None, Some(i)).unwrap();
@@ -965,7 +948,6 @@ mod test_vecs {
         let mut key = keys::CoseKey::new();
         key.set_bytes(UID.to_vec());
         key.decode().unwrap();
-        key.set_alg(Some(algs::A256KW));
 
         let mut agent = agent::CoseAgent::new();
         agent.set_header(header);
@@ -1013,7 +995,6 @@ mod test_vecs {
         let mut key = keys::CoseKey::new();
         key.set_bytes(UID.to_vec());
         key.decode().unwrap();
-        key.set_alg(Some(algs::AES_MAC_128_64));
         verify.set_agent_key(i, &key).unwrap();
 
         verify.decode(None, Some(i)).unwrap();
@@ -1028,7 +1009,6 @@ mod test_vecs {
         let mut key = keys::CoseKey::new();
         key.set_bytes(OUR_SECRET.to_vec());
         key.decode().unwrap();
-        key.set_alg(Some(algs::AES_MAC_256_64));
         verify.key(&key).unwrap();
         verify.decode(None, None).unwrap();
     }
