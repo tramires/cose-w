@@ -1,5 +1,4 @@
 use crate::keys;
-
 use aes::{Aes128, Aes192, Aes256};
 use aes_kw::{Kek, KekAes128, KekAes192, KekAes256};
 use cbc_mac::{CbcMac, Mac};
@@ -262,27 +261,27 @@ pub(crate) fn sign(
     match alg {
         EDDSA => {
             let crv = crv.ok_or(JsValue::from("Missing curve"))?;
-            use ed25519_compact::SecretKey;
-            let mut ed_key;
             if crv == keys::ED25519 {
+                use ed25519_compact::SecretKey;
+                let mut ed_key;
                 ed_key = DER_S2.to_vec();
                 ed_key.append(&mut key.clone());
+                let priv_key = match SecretKey::from_der(&ed_key) {
+                    Ok(v) => v,
+                    Err(_) => return Err(JsValue::from("Invalid EDDSA private key")),
+                };
+                let signature = priv_key.sign(&content, None);
+                s = signature.as_slice().to_vec();
             } else if crv == keys::ED448 {
                 return Err(JsValue::from("Ed448 not implemented"));
             } else {
                 return Err(JsValue::from("Invalid curve"));
             }
-            let priv_key = match SecretKey::from_der(&ed_key) {
-                Ok(v) => v,
-                Err(_) => return Err(JsValue::from("Invalid EDDSA private key")),
-            };
-            let signature = priv_key.sign(&content, None);
-            s = signature.as_slice().to_vec();
         }
         ES256 => {
             let crv = crv.ok_or(JsValue::from("Missing curve"))?;
             use p256::ecdsa::{signature::Signer, SigningKey};
-            if crv != keys::P_256 {
+            if ![keys::P_256, keys::P_384].contains(&crv) {
                 return Err(JsValue::from("Invalid curve"));
             }
             let priv_key = match SigningKey::from_bytes(&key) {
@@ -307,7 +306,7 @@ pub(crate) fn sign(
         ES384 => {
             let crv = crv.ok_or(JsValue::from("Missing curve"))?;
             use p384::ecdsa::{signature::Signer, SigningKey};
-            if crv != keys::P_384 {
+            if ![keys::P_256, keys::P_384].contains(&crv) {
                 return Err(JsValue::from("Invalid curve"));
             }
             let priv_key = match SigningKey::from_bytes(&key) {
@@ -317,33 +316,28 @@ pub(crate) fn sign(
             s = priv_key.sign(&content).to_vec();
         }
         ES512 => {
-            let crv = crv.ok_or(JsValue::from("Missing curve"))?;
-            if crv != keys::P_521 {
-                return Err(JsValue::from("Invalid curve"));
-            }
             return Err(JsValue::from("ES512 not implemented"));
         }
         PS256 | PS384 | PS512 => {
-            use rsa::pkcs1::DecodeRsaPrivateKey;
-            use rsa::pss::SigningKey;
-            use rsa::signature::RandomizedSigner;
-            use rsa::signature::SignatureEncoding;
-            use rsa::RsaPrivateKey;
+            use rsa::{
+                pkcs1::DecodeRsaPrivateKey,
+                pss::SigningKey,
+                signature::{RandomizedSigner, SignatureEncoding},
+                RsaPrivateKey,
+            };
             let priv_key = match RsaPrivateKey::from_pkcs1_der(&key) {
                 Ok(v) => v,
                 Err(_) => return Err(JsValue::from("Invalid RSA private key")),
             };
+            let mut rng = rand::thread_rng();
             if alg == PS256 {
                 let signing_key: SigningKey<Sha256> = SigningKey::new(priv_key);
-                let mut rng = rand::thread_rng();
                 s = signing_key.sign_with_rng(&mut rng, &content).to_vec();
             } else if alg == PS384 {
                 let signing_key: SigningKey<Sha384> = SigningKey::new(priv_key);
-                let mut rng = rand::thread_rng();
                 s = signing_key.sign_with_rng(&mut rng, &content).to_vec();
             } else {
                 let signing_key: SigningKey<Sha512> = SigningKey::new(priv_key);
-                let mut rng = rand::thread_rng();
                 s = signing_key.sign_with_rng(&mut rng, &content).to_vec();
             }
         }
@@ -364,26 +358,26 @@ pub(crate) fn verify(
     let v: bool;
     match alg {
         EDDSA => {
-            use ed25519_compact::{PublicKey, Signature};
-            let mut ed_key;
             let crv = crv.ok_or(JsValue::from("Missing curve"))?;
             if crv == keys::ED25519 {
+                use ed25519_compact::{PublicKey, Signature};
+                let mut ed_key;
                 ed_key = DER_P2.to_vec();
                 ed_key.append(&mut key.clone());
+                let ec_public_key = match PublicKey::from_der(&ed_key) {
+                    Ok(v) => v,
+                    Err(_) => return Err(JsValue::from("Invalid EDDSA public key")),
+                };
+                let sig: Signature = match Signature::from_slice(&signature) {
+                    Ok(v) => v,
+                    Err(_) => return Err(JsValue::from("Invalid signature")),
+                };
+                v = ec_public_key.verify(&content, &sig).is_ok();
             } else if crv == keys::ED448 {
                 return Err(JsValue::from("Ed448 not implemented"));
             } else {
                 return Err(JsValue::from("Invalid curve"));
             }
-            let ec_public_key = match PublicKey::from_der(&ed_key) {
-                Ok(v) => v,
-                Err(_) => return Err(JsValue::from("Invalid EDDSA public key")),
-            };
-            let sig: Signature = match Signature::from_slice(&signature) {
-                Ok(v) => v,
-                Err(_) => return Err(JsValue::from("Invalid signature")),
-            };
-            v = ec_public_key.verify(&content, &sig).is_ok();
         }
         ES256K => {
             use k256::ecdsa::{signature::Verifier, Signature, VerifyingKey};
@@ -404,7 +398,7 @@ pub(crate) fn verify(
         ES256 => {
             use p256::ecdsa::{signature::Verifier, Signature, VerifyingKey};
             let crv = crv.ok_or(JsValue::from("Missing curve"))?;
-            if crv != keys::P_256 {
+            if ![keys::P_256, keys::P_384].contains(&crv) {
                 return Err(JsValue::from("Invalid curve"));
             }
             let pub_key = match VerifyingKey::from_sec1_bytes(&key) {
@@ -420,7 +414,7 @@ pub(crate) fn verify(
         ES384 => {
             use p384::ecdsa::{signature::Verifier, Signature, VerifyingKey};
             let crv = crv.ok_or(JsValue::from("Invalid curve"))?;
-            if crv != keys::P_384 {
+            if ![keys::P_256, keys::P_384].contains(&crv) {
                 return Err(JsValue::from("Invalid curve"));
             }
             let pub_key = match VerifyingKey::from_sec1_bytes(&key) {
@@ -434,41 +428,31 @@ pub(crate) fn verify(
             v = pub_key.verify(&content, &signature).is_ok();
         }
         ES512 => {
-            let crv = crv.ok_or(JsValue::from("Invalid curve"))?;
-            if crv != keys::P_521 {
-                return Err(JsValue::from("Invalid curve"));
-            }
             return Err(JsValue::from("ES512 not implemented"));
         }
         PS256 | PS384 | PS512 => {
-            use rsa::pkcs8::DecodePublicKey;
-            use rsa::pss::{Signature, VerifyingKey};
-            use rsa::signature::Verifier;
-            use rsa::RsaPublicKey;
+            use rsa::{
+                pkcs8::DecodePublicKey,
+                pss::{Signature, VerifyingKey},
+                signature::Verifier,
+                RsaPublicKey,
+            };
             let pub_key = match RsaPublicKey::from_public_key_der(&key) {
                 Ok(v) => v,
                 Err(_) => return Err(JsValue::from("Invalid RSA public key")),
             };
+            let signature: Signature = match Signature::try_from(signature.as_slice()) {
+                Ok(v) => v,
+                Err(_) => return Err(JsValue::from("Invalid signature")),
+            };
             if alg == PS256 {
                 let verifying_key: VerifyingKey<Sha256> = VerifyingKey::new(pub_key);
-                let signature: Signature = match Signature::try_from(signature.as_slice()) {
-                    Ok(v) => v,
-                    Err(_) => return Err(JsValue::from("Invalid signature")),
-                };
                 v = verifying_key.verify(&content, &signature).is_ok();
             } else if alg == PS384 {
                 let verifying_key: VerifyingKey<Sha384> = VerifyingKey::new(pub_key);
-                let signature: Signature = match Signature::try_from(signature.as_slice()) {
-                    Ok(v) => v,
-                    Err(_) => return Err(JsValue::from("Invalid signature")),
-                };
                 v = verifying_key.verify(&content, &signature).is_ok();
             } else {
                 let verifying_key: VerifyingKey<Sha512> = VerifyingKey::new(pub_key);
-                let signature: Signature = match Signature::try_from(signature.as_slice()) {
-                    Ok(v) => v,
-                    Err(_) => return Err(JsValue::from("Invalid signature")),
-                };
                 v = verifying_key.verify(&content, &signature).is_ok();
             }
         }
@@ -494,28 +478,24 @@ fn verify_mac_key(alg: i32, l: usize) -> Result<(), JsValue> {
         Ok(())
     }
 }
+
 pub(crate) fn mac(alg: i32, key: &Vec<u8>, content: &Vec<u8>) -> Result<Vec<u8>, JsValue> {
     let mut message_digest;
     let size;
     verify_mac_key(alg, key.len())?;
     match alg {
-        HMAC_256_64 => {
+        HMAC_256_64 | HMAC_256_256 => {
             let mut mac = match HmacSha256::new_from_slice(key.as_slice()) {
                 Ok(v) => v,
                 Err(_) => return Err(JsValue::from("Invalid HMAC_256_64 key")),
             };
             mac.update(&content);
             message_digest = mac.finalize().into_bytes().to_vec();
-            size = 8;
-        }
-        HMAC_256_256 => {
-            let mut mac = match HmacSha256::new_from_slice(key.as_slice()) {
-                Ok(v) => v,
-                Err(_) => return Err(JsValue::from("Invalid HMAC_256_256 key")),
-            };
-            mac.update(&content);
-            message_digest = mac.finalize().into_bytes().to_vec();
-            size = 32;
+            if alg == HMAC_256_64 {
+                size = 8;
+            } else {
+                size = 32;
+            }
         }
         HMAC_384_384 => {
             let mut mac = match HmacSha384::new_from_slice(key.as_slice()) {
@@ -535,40 +515,30 @@ pub(crate) fn mac(alg: i32, key: &Vec<u8>, content: &Vec<u8>) -> Result<Vec<u8>,
             message_digest = mac.finalize().into_bytes().to_vec();
             size = 64;
         }
-        AES_MAC_128_64 => {
+        AES_MAC_128_64 | AES_MAC_128_128 => {
             let mut mac = match Daa128::new_from_slice(&key) {
                 Ok(v) => v,
                 Err(_) => return Err(JsValue::from("Invalid AES_MAC_128_64 key")),
             };
             mac.update(&content);
-            size = 8;
+            if alg == AES_MAC_128_64 {
+                size = 8;
+            } else {
+                size = 16;
+            }
             message_digest = mac.finalize().into_bytes().to_vec();
         }
-        AES_MAC_256_64 => {
+        AES_MAC_256_64 | AES_MAC_256_128 => {
             let mut mac = match Daa256::new_from_slice(&key) {
                 Ok(v) => v,
                 Err(_) => return Err(JsValue::from("Invalid AES_MAC_256_64 key")),
             };
             mac.update(&content);
-            size = 8;
-            message_digest = mac.finalize().into_bytes().to_vec();
-        }
-        AES_MAC_128_128 => {
-            let mut mac = match Daa128::new_from_slice(&key) {
-                Ok(v) => v,
-                Err(_) => return Err(JsValue::from("Invalid AES_MAC_128_128 key")),
-            };
-            mac.update(&content);
-            size = 16;
-            message_digest = mac.finalize().into_bytes().to_vec();
-        }
-        AES_MAC_256_128 => {
-            let mut mac = match Daa256::new_from_slice(&key) {
-                Ok(v) => v,
-                Err(_) => return Err(JsValue::from("Invalid AES_MAC_256_128 key")),
-            };
-            mac.update(&content);
-            size = 16;
+            if alg == AES_MAC_256_64 {
+                size = 8;
+            } else {
+                size = 16;
+            }
             message_digest = mac.finalize().into_bytes().to_vec();
         }
         _ => {
@@ -589,24 +559,18 @@ pub(crate) fn mac_verify(
     let size;
     verify_mac_key(alg, key.len())?;
     match alg {
-        HMAC_256_64 => {
+        HMAC_256_64 | HMAC_256_256 => {
             let mut mac = match HmacSha256::new_from_slice(key.as_slice()) {
                 Ok(v) => v,
                 Err(_) => return Err(JsValue::from("Invalid HMAC_256_64 key")),
             };
             mac.update(&content);
             message_digest = mac.finalize().into_bytes().to_vec();
-            size = 8;
-        }
-        HMAC_256_256 => {
-            let mut mac = match HmacSha256::new_from_slice(key.as_slice()) {
-                Ok(v) => v,
-                Err(_) => return Err(JsValue::from("Invalid HMAC_256_256 key")),
-            };
-
-            mac.update(&content);
-            message_digest = mac.finalize().into_bytes().to_vec();
-            size = 32;
+            if alg == HMAC_256_64 {
+                size = 8;
+            } else {
+                size = 32;
+            }
         }
         HMAC_384_384 => {
             let mut mac = match HmacSha384::new_from_slice(key.as_slice()) {
@@ -626,40 +590,30 @@ pub(crate) fn mac_verify(
             message_digest = mac.finalize().into_bytes().to_vec();
             size = 64;
         }
-        AES_MAC_128_64 => {
+        AES_MAC_128_64 | AES_MAC_128_128 => {
             let mut mac = match Daa128::new_from_slice(&key) {
                 Ok(v) => v,
                 Err(_) => return Err(JsValue::from("Invalid AES_MAC_128_64 key")),
             };
             mac.update(&content);
-            size = 8;
+            if alg == AES_MAC_128_64 {
+                size = 8;
+            } else {
+                size = 16;
+            }
             message_digest = mac.finalize().into_bytes().to_vec();
         }
-        AES_MAC_256_64 => {
+        AES_MAC_256_64 | AES_MAC_256_128 => {
             let mut mac = match Daa256::new_from_slice(&key) {
                 Ok(v) => v,
                 Err(_) => return Err(JsValue::from("Invalid AES_MAC_256_64 key")),
             };
             mac.update(&content);
-            size = 8;
-            message_digest = mac.finalize().into_bytes().to_vec();
-        }
-        AES_MAC_128_128 => {
-            let mut mac = match Daa128::new_from_slice(&key) {
-                Ok(v) => v,
-                Err(_) => return Err(JsValue::from("Invalid AES_MAC_128_128 key")),
-            };
-            mac.update(&content);
-            size = 16;
-            message_digest = mac.finalize().into_bytes().to_vec();
-        }
-        AES_MAC_256_128 => {
-            let mut mac = match Daa256::new_from_slice(&key) {
-                Ok(v) => v,
-                Err(_) => return Err(JsValue::from("Invalid AES_MAC_256_128 key")),
-            };
-            mac.update(&content);
-            size = 16;
+            if alg == AES_MAC_256_64 {
+                size = 8;
+            } else {
+                size = 16;
+            }
             message_digest = mac.finalize().into_bytes().to_vec();
         }
         _ => {
@@ -676,6 +630,11 @@ pub(crate) fn encrypt(
     payload: &Vec<u8>,
     aead: &Vec<u8>,
 ) -> Result<Vec<u8>, JsValue> {
+    use ccm::{
+        aead::{generic_array::GenericArray, AeadInPlace, KeyInit},
+        consts::{U13, U16, U7, U8},
+        Ccm,
+    };
     let mut c = payload.to_vec();
     match alg {
         A128GCM => {
@@ -744,13 +703,7 @@ pub(crate) fn encrypt(
             }
         }
         AES_CCM_16_64_128 => {
-            use ccm::{
-                aead::{generic_array::GenericArray, AeadInPlace, KeyInit},
-                consts::{U13, U8},
-                Ccm,
-            };
-            type AesCcm = Ccm<Aes128, U8, U13>;
-            let cipher = match AesCcm::new_from_slice(&key) {
+            let cipher = match Ccm::<Aes128, U8, U13>::new_from_slice(&key) {
                 Ok(v) => v,
                 Err(_) => return Err(JsValue::from("Invalid AES_CCM_16_64_128 key")),
             };
@@ -761,13 +714,7 @@ pub(crate) fn encrypt(
             };
         }
         AES_CCM_16_64_256 => {
-            use ccm::{
-                aead::{generic_array::GenericArray, AeadInPlace, KeyInit},
-                consts::{U13, U8},
-                Ccm,
-            };
-            type AesCcm = Ccm<Aes256, U8, U13>;
-            let cipher = match AesCcm::new_from_slice(&key) {
+            let cipher = match Ccm::<Aes256, U8, U13>::new_from_slice(&key) {
                 Ok(v) => v,
                 Err(_) => return Err(JsValue::from("Invalid AES_CCM_16_64_256 key")),
             };
@@ -778,13 +725,7 @@ pub(crate) fn encrypt(
             };
         }
         AES_CCM_64_64_128 => {
-            use ccm::{
-                aead::{generic_array::GenericArray, AeadInPlace, KeyInit},
-                consts::{U7, U8},
-                Ccm,
-            };
-            type AesCcm = Ccm<Aes128, U8, U7>;
-            let cipher = match AesCcm::new_from_slice(&key) {
+            let cipher = match Ccm::<Aes128, U8, U7>::new_from_slice(&key) {
                 Ok(v) => v,
                 Err(_) => return Err(JsValue::from("Invalid AES_CCM_64_64_128 key")),
             };
@@ -795,13 +736,7 @@ pub(crate) fn encrypt(
             };
         }
         AES_CCM_64_64_256 => {
-            use ccm::{
-                aead::{generic_array::GenericArray, AeadInPlace, KeyInit},
-                consts::{U7, U8},
-                Ccm,
-            };
-            type AesCcm = Ccm<Aes256, U8, U7>;
-            let cipher = match AesCcm::new_from_slice(&key) {
+            let cipher = match Ccm::<Aes256, U8, U7>::new_from_slice(&key) {
                 Ok(v) => v,
                 Err(_) => return Err(JsValue::from("Invalid AES_CCM_64_64_256 key")),
             };
@@ -812,13 +747,7 @@ pub(crate) fn encrypt(
             };
         }
         AES_CCM_16_128_128 => {
-            use ccm::{
-                aead::{generic_array::GenericArray, AeadInPlace, KeyInit},
-                consts::{U13, U16},
-                Ccm,
-            };
-            type AesCcm = Ccm<Aes128, U16, U13>;
-            let cipher = match AesCcm::new_from_slice(&key) {
+            let cipher = match Ccm::<Aes128, U16, U13>::new_from_slice(&key) {
                 Ok(v) => v,
                 Err(_) => return Err(JsValue::from("Invalid AES_CCM_16_128_128 key")),
             };
@@ -829,13 +758,7 @@ pub(crate) fn encrypt(
             };
         }
         AES_CCM_16_128_256 => {
-            use ccm::{
-                aead::{generic_array::GenericArray, AeadInPlace, KeyInit},
-                consts::{U13, U16},
-                Ccm,
-            };
-            type AesCcm = Ccm<Aes256, U16, U13>;
-            let cipher = match AesCcm::new_from_slice(&key) {
+            let cipher = match Ccm::<Aes256, U16, U13>::new_from_slice(&key) {
                 Ok(v) => v,
                 Err(_) => return Err(JsValue::from("Invalid AES_CCM_16_128_256 key")),
             };
@@ -846,13 +769,7 @@ pub(crate) fn encrypt(
             };
         }
         AES_CCM_64_128_128 => {
-            use ccm::{
-                aead::{generic_array::GenericArray, AeadInPlace, KeyInit},
-                consts::{U16, U7},
-                Ccm,
-            };
-            type AesCcm = Ccm<Aes128, U16, U7>;
-            let cipher = match AesCcm::new_from_slice(&key) {
+            let cipher = match Ccm::<Aes128, U16, U7>::new_from_slice(&key) {
                 Ok(v) => v,
                 Err(_) => return Err(JsValue::from("Invalid AES_CCM_64_128_128 key")),
             };
@@ -863,13 +780,7 @@ pub(crate) fn encrypt(
             };
         }
         AES_CCM_64_128_256 => {
-            use ccm::{
-                aead::{generic_array::GenericArray, AeadInPlace, KeyInit},
-                consts::{U16, U7},
-                Ccm,
-            };
-            type AesCcm = Ccm<Aes256, U16, U7>;
-            let cipher = match AesCcm::new_from_slice(&key) {
+            let cipher = match Ccm::<Aes256, U16, U7>::new_from_slice(&key) {
                 Ok(v) => v,
                 Err(_) => return Err(JsValue::from("Invalid AES_CCM_64_128_256 key")),
             };
@@ -893,6 +804,11 @@ pub(crate) fn decrypt(
     ciphertext: &Vec<u8>,
     aead: &Vec<u8>,
 ) -> Result<Vec<u8>, JsValue> {
+    use ccm::{
+        aead::{generic_array::GenericArray, AeadInPlace, KeyInit},
+        consts::{U13, U16, U7, U8},
+        Ccm,
+    };
     let mut c = ciphertext.to_vec();
     match alg {
         A128GCM => {
@@ -961,13 +877,7 @@ pub(crate) fn decrypt(
             };
         }
         AES_CCM_16_64_128 => {
-            use ccm::{
-                aead::{generic_array::GenericArray, AeadInPlace, KeyInit},
-                consts::{U13, U8},
-                Ccm,
-            };
-            type AesCcm = Ccm<Aes128, U8, U13>;
-            let cipher = match AesCcm::new_from_slice(&key) {
+            let cipher = match Ccm::<Aes128, U8, U13>::new_from_slice(&key) {
                 Ok(v) => v,
                 Err(_) => return Err(JsValue::from("Invalid AES_CCM_16_64_128 key")),
             };
@@ -978,13 +888,7 @@ pub(crate) fn decrypt(
             };
         }
         AES_CCM_16_64_256 => {
-            use ccm::{
-                aead::{generic_array::GenericArray, AeadInPlace, KeyInit},
-                consts::{U13, U8},
-                Ccm,
-            };
-            type AesCcm = Ccm<Aes256, U8, U13>;
-            let cipher = match AesCcm::new_from_slice(&key) {
+            let cipher = match Ccm::<Aes256, U8, U13>::new_from_slice(&key) {
                 Ok(v) => v,
                 Err(_) => return Err(JsValue::from("Invalid AES_CCM_16_64_256 key")),
             };
@@ -995,13 +899,7 @@ pub(crate) fn decrypt(
             };
         }
         AES_CCM_64_64_128 => {
-            use ccm::{
-                aead::{generic_array::GenericArray, AeadInPlace, KeyInit},
-                consts::{U7, U8},
-                Ccm,
-            };
-            type AesCcm = Ccm<Aes128, U8, U7>;
-            let cipher = match AesCcm::new_from_slice(&key) {
+            let cipher = match Ccm::<Aes128, U8, U7>::new_from_slice(&key) {
                 Ok(v) => v,
                 Err(_) => return Err(JsValue::from("Invalid AES_CCM_64_64_128 key")),
             };
@@ -1012,13 +910,7 @@ pub(crate) fn decrypt(
             };
         }
         AES_CCM_64_64_256 => {
-            use ccm::{
-                aead::{generic_array::GenericArray, AeadInPlace, KeyInit},
-                consts::{U7, U8},
-                Ccm,
-            };
-            type AesCcm = Ccm<Aes256, U8, U7>;
-            let cipher = match AesCcm::new_from_slice(&key) {
+            let cipher = match Ccm::<Aes256, U8, U7>::new_from_slice(&key) {
                 Ok(v) => v,
                 Err(_) => return Err(JsValue::from("Invalid AES_CCM_64_64_256 key")),
             };
@@ -1029,13 +921,7 @@ pub(crate) fn decrypt(
             };
         }
         AES_CCM_16_128_128 => {
-            use ccm::{
-                aead::{generic_array::GenericArray, AeadInPlace, KeyInit},
-                consts::{U13, U16},
-                Ccm,
-            };
-            type AesCcm = Ccm<Aes128, U16, U13>;
-            let cipher = match AesCcm::new_from_slice(&key) {
+            let cipher = match Ccm::<Aes128, U16, U13>::new_from_slice(&key) {
                 Ok(v) => v,
                 Err(_) => return Err(JsValue::from("Invalid AES_CCM_16_128_128 key")),
             };
@@ -1046,13 +932,7 @@ pub(crate) fn decrypt(
             };
         }
         AES_CCM_16_128_256 => {
-            use ccm::{
-                aead::{generic_array::GenericArray, AeadInPlace, KeyInit},
-                consts::{U13, U16},
-                Ccm,
-            };
-            type AesCcm = Ccm<Aes256, U16, U13>;
-            let cipher = match AesCcm::new_from_slice(&key) {
+            let cipher = match Ccm::<Aes256, U16, U13>::new_from_slice(&key) {
                 Ok(v) => v,
                 Err(_) => return Err(JsValue::from("Invalid AES_CCM_16_128_256 key")),
             };
@@ -1063,13 +943,7 @@ pub(crate) fn decrypt(
             };
         }
         AES_CCM_64_128_128 => {
-            use ccm::{
-                aead::{generic_array::GenericArray, AeadInPlace, KeyInit},
-                consts::{U16, U7},
-                Ccm,
-            };
-            type AesCcm = Ccm<Aes128, U16, U7>;
-            let cipher = match AesCcm::new_from_slice(&key) {
+            let cipher = match Ccm::<Aes128, U16, U7>::new_from_slice(&key) {
                 Ok(v) => v,
                 Err(_) => return Err(JsValue::from("Invalid AES_CCM_64_128_128 key")),
             };
@@ -1080,13 +954,7 @@ pub(crate) fn decrypt(
             };
         }
         AES_CCM_64_128_256 => {
-            use ccm::{
-                aead::{generic_array::GenericArray, AeadInPlace, KeyInit},
-                consts::{U16, U7},
-                Ccm,
-            };
-            type AesCcm = Ccm<Aes256, U16, U7>;
-            let cipher = match AesCcm::new_from_slice(&key) {
+            let cipher = match Ccm::<Aes256, U16, U7>::new_from_slice(&key) {
                 Ok(v) => v,
                 Err(_) => return Err(JsValue::from("Invalid AES_CCM_64_128_256 key")),
             };
@@ -1186,37 +1054,25 @@ pub(crate) fn rsa_oaep_enc(key: &Vec<u8>, cek: &Vec<u8>, alg: &i32) -> Result<Ve
         Ok(v) => v,
         Err(_) => return Err(JsValue::from("Invalid RSA OAEP key")),
     };
+    let mut rng = rand::thread_rng();
+    let padding;
     match *alg {
         RSA_OAEP_1 => {
-            let padding = Oaep::new::<Sha1>();
-            let mut rng = rand::thread_rng();
-
-            match rsa_key.encrypt(&mut rng, padding, &cek) {
-                Ok(v) => Ok(v.to_vec()),
-                Err(_) => Err(JsValue::from("Error during Encryption")),
-            }
+            padding = Oaep::new::<Sha1>();
         }
         RSA_OAEP_256 => {
-            let padding = Oaep::new::<Sha256>();
-            let mut rng = rand::thread_rng();
-
-            match rsa_key.encrypt(&mut rng, padding, &cek) {
-                Ok(v) => Ok(v.to_vec()),
-                Err(_) => Err(JsValue::from("Error during Encryption")),
-            }
+            padding = Oaep::new::<Sha256>();
         }
         RSA_OAEP_512 => {
-            let padding = Oaep::new::<Sha512>();
-            let mut rng = rand::thread_rng();
-
-            match rsa_key.encrypt(&mut rng, padding, &cek) {
-                Ok(v) => Ok(v.to_vec()),
-                Err(_) => Err(JsValue::from("Error during Encryption")),
-            }
+            padding = Oaep::new::<Sha512>();
         }
         _ => {
             return Err(JsValue::from("Invalid algorithm"));
         }
+    }
+    match rsa_key.encrypt(&mut rng, padding, &cek) {
+        Ok(v) => Ok(v.to_vec()),
+        Err(_) => Err(JsValue::from("Error during Encryption")),
     }
 }
 
@@ -1232,31 +1088,24 @@ pub(crate) fn rsa_oaep_dec(
         Ok(v) => v,
         Err(_) => return Err(JsValue::from("Invalid RSA OAEP key")),
     };
+    let padding;
     match *alg {
         RSA_OAEP_1 => {
-            let padding = Oaep::new::<Sha1>();
-            match rsa_key.decrypt(padding, &cek) {
-                Ok(v) => Ok(v[..size].to_vec()),
-                Err(_) => Err(JsValue::from("Error during Decryption")),
-            }
+            padding = Oaep::new::<Sha1>();
         }
         RSA_OAEP_256 => {
-            let padding = Oaep::new::<Sha256>();
-            match rsa_key.decrypt(padding, &cek) {
-                Ok(v) => Ok(v[..size].to_vec()),
-                Err(_) => Err(JsValue::from("Error during Decryption")),
-            }
+            padding = Oaep::new::<Sha256>();
         }
         RSA_OAEP_512 => {
-            let padding = Oaep::new::<Sha512>();
-            match rsa_key.decrypt(padding, &cek) {
-                Ok(v) => Ok(v[..size].to_vec()),
-                Err(_) => Err(JsValue::from("Error during Decryption")),
-            }
+            padding = Oaep::new::<Sha512>();
         }
         _ => {
             return Err(JsValue::from("Invalid algorithm"));
         }
+    }
+    match rsa_key.decrypt(padding, &cek) {
+        Ok(v) => Ok(v[..size].to_vec()),
+        Err(_) => Err(JsValue::from("Error during Decryption")),
     }
 }
 
