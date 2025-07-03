@@ -281,7 +281,7 @@ pub(crate) fn sign(
         ES256 => {
             let crv = crv.ok_or(JsValue::from("Missing curve"))?;
             use p256::ecdsa::{signature::Signer, SigningKey};
-            if ![keys::P_256, keys::P_384].contains(&crv) {
+            if ![keys::P_256, keys::P_384, keys::P_521].contains(&crv) {
                 return Err(JsValue::from("Invalid curve"));
             }
             let priv_key = match SigningKey::from_bytes(&key) {
@@ -306,7 +306,7 @@ pub(crate) fn sign(
         ES384 => {
             let crv = crv.ok_or(JsValue::from("Missing curve"))?;
             use p384::ecdsa::{signature::Signer, SigningKey};
-            if ![keys::P_256, keys::P_384].contains(&crv) {
+            if ![keys::P_256, keys::P_384, keys::P_521].contains(&crv) {
                 return Err(JsValue::from("Invalid curve"));
             }
             let priv_key = match SigningKey::from_bytes(&key) {
@@ -316,6 +316,10 @@ pub(crate) fn sign(
             s = priv_key.sign(&content).to_vec();
         }
         ES512 => {
+            let crv = crv.ok_or(JsValue::from("Invalid curve"))?;
+            if ![keys::P_256, keys::P_384, keys::P_521].contains(&crv) {
+                return Err(JsValue::from("Invalid curve"));
+            }
             return Err(JsValue::from("ES512 not implemented"));
         }
         PS256 | PS384 | PS512 => {
@@ -398,7 +402,7 @@ pub(crate) fn verify(
         ES256 => {
             use p256::ecdsa::{signature::Verifier, Signature, VerifyingKey};
             let crv = crv.ok_or(JsValue::from("Missing curve"))?;
-            if ![keys::P_256, keys::P_384].contains(&crv) {
+            if ![keys::P_256, keys::P_384, keys::P_521].contains(&crv) {
                 return Err(JsValue::from("Invalid curve"));
             }
             let pub_key = match VerifyingKey::from_sec1_bytes(&key) {
@@ -414,7 +418,7 @@ pub(crate) fn verify(
         ES384 => {
             use p384::ecdsa::{signature::Verifier, Signature, VerifyingKey};
             let crv = crv.ok_or(JsValue::from("Invalid curve"))?;
-            if ![keys::P_256, keys::P_384].contains(&crv) {
+            if ![keys::P_256, keys::P_384, keys::P_521].contains(&crv) {
                 return Err(JsValue::from("Invalid curve"));
             }
             let pub_key = match VerifyingKey::from_sec1_bytes(&key) {
@@ -428,6 +432,10 @@ pub(crate) fn verify(
             v = pub_key.verify(&content, &signature).is_ok();
         }
         ES512 => {
+            let crv = crv.ok_or(JsValue::from("Invalid curve"))?;
+            if ![keys::P_256, keys::P_384, keys::P_521].contains(&crv) {
+                return Err(JsValue::from("Invalid curve"));
+            }
             return Err(JsValue::from("ES512 not implemented"));
         }
         PS256 | PS384 | PS512 => {
@@ -1365,7 +1373,13 @@ mod unit_tests {
         ];
         let valid_pairs = [
             (algs::ES256, keys::P_256),
+            (algs::ES256, keys::P_384),
+            (algs::ES256, keys::P_521),
+            (algs::ES384, keys::P_256),
             (algs::ES384, keys::P_384),
+            (algs::ES384, keys::P_521),
+            (algs::ES512, keys::P_256),
+            (algs::ES512, keys::P_384),
             (algs::ES512, keys::P_521),
             (algs::EDDSA, keys::ED25519),
             (algs::EDDSA, keys::ED448),
