@@ -672,3 +672,116 @@ impl CoseHeader {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod test_vecs {
+    use crate::headers::*;
+    use wasm_bindgen_test::*;
+
+    #[wasm_bindgen_test]
+    fn test_unique_header() {
+        let mut header = CoseHeader::new();
+        header.set_alg(algs::A128GCM, false, false);
+        assert_eq!(vec![ALG], header.unprotected);
+        assert!(header.protected.is_empty());
+        header.set_alg(algs::A128GCM, true, false);
+        assert_eq!(vec![ALG], header.protected);
+        assert!(header.unprotected.is_empty());
+    }
+
+    #[wasm_bindgen_test]
+    fn test_crit() {
+        let mut header = CoseHeader::new();
+        header.set_alg(algs::A128GCM, false, true);
+        assert_eq!([ALG].to_vec(), header.crit);
+        header.set_kid(vec![], false, true);
+        assert_eq!([ALG, KID].to_vec(), header.crit);
+        header.set_alg(algs::A128GCM, false, false);
+        assert_eq!([KID].to_vec(), header.crit);
+        header.set_kid(vec![], false, false);
+        assert!(header.crit.is_empty());
+    }
+
+    #[wasm_bindgen_test]
+    fn test_iv_and_partial() {
+        let mut header = CoseHeader::new();
+        header.set_iv(vec![], false, true);
+        assert_eq!(vec![IV], header.unprotected);
+        assert_eq!(vec![IV], header.crit);
+        header.set_partial_iv(vec![], false, true);
+        assert_eq!(vec![PARTIAL_IV], header.unprotected);
+        assert_eq!(vec![PARTIAL_IV], header.crit);
+    }
+
+    #[wasm_bindgen_test]
+    fn test_ecdh_key_unique() {
+        let key = keys::CoseKey::new();
+        let mut header = CoseHeader::new();
+
+        header.set_static_kid(vec![], key.clone(), false, true);
+        assert_eq!(vec![STATIC_KEY_ID], header.unprotected);
+        assert_eq!(vec![STATIC_KEY_ID], header.crit);
+
+        header.ephemeral_key(key.clone(), false, true);
+        assert_eq!(vec![EPHEMERAL_KEY], header.unprotected);
+        assert_eq!(vec![EPHEMERAL_KEY], header.crit);
+
+        header.static_key(key, false, true);
+        assert_eq!(vec![STATIC_KEY], header.unprotected);
+        assert_eq!(vec![STATIC_KEY], header.crit);
+    }
+
+    #[wasm_bindgen_test]
+    fn decode_duplicate_label() {
+        let encoded = hex::decode("a3012601382e04423131").unwrap();
+        let mut header = CoseHeader::new();
+        assert_eq!(
+            header.decode_protected_bstr(encoded),
+            Err("Duplicate label 1".into())
+        );
+    }
+
+    #[wasm_bindgen_test]
+    fn decode_invalid_label() {
+        let encoded = hex::decode("a30126190fa0382e04423131").unwrap();
+        let mut header = CoseHeader::new();
+        assert_eq!(
+            header.decode_protected_bstr(encoded),
+            Err("Invalid label 4000".into())
+        );
+    }
+    #[wasm_bindgen_test]
+    fn header_encode_decode() {
+        let unprot_bytes = hex::decode("a205400301").unwrap();
+        let prot_bytes = hex::decode("a2012604423131").unwrap();
+        let kid = b"11".to_vec();
+        let content_type = "1";
+
+        let mut header = CoseHeader::new();
+        header.set_alg(algs::ES256, true, false);
+        header.set_kid(kid.clone(), true, false);
+        header.set_iv(vec![], false, false);
+        header.set_content_type(content_type.parse::<u32>().unwrap(), false, false);
+        let mut encoder = Encoder::new();
+        header.encode_unprotected(&mut encoder).unwrap();
+        assert_eq!(unprot_bytes, encoder.encoded());
+
+        assert_eq!(prot_bytes, header.get_protected_bstr(true).unwrap());
+
+        header = CoseHeader::new();
+        header.decode_protected_bstr(prot_bytes).unwrap();
+
+        assert_eq!(header.alg(), Some(algs::ES256));
+        assert_eq!(header.kid(), Some(kid.clone()));
+        assert_eq!(header.iv(), None);
+        assert_eq!(header.content_type(), None);
+
+        let mut decoder = Decoder::new(unprot_bytes);
+        header.decode_unprotected(&mut decoder, false).unwrap();
+
+        assert_eq!(header.alg(), Some(algs::ES256));
+        assert_eq!(header.kid(), Some(kid));
+        assert_eq!(header.iv(), Some(vec![]));
+        assert_eq!(header.content_type(), Some(content_type.to_string()));
+    }
+}

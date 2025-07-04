@@ -1011,3 +1011,174 @@ impl CoseKeySet {
         return Err(JsValue::from("Key not found"));
     }
 }
+
+#[cfg(test)]
+mod test_vecs {
+    use crate::keys::*;
+    use wasm_bindgen_test::*;
+
+    #[wasm_bindgen_test]
+    fn verify_curve() {
+        let mut key = CoseKey::new();
+        assert!(key.verify_curve().is_err());
+
+        key.set_kty(Some(SYMMETRIC));
+        key.verify_curve().unwrap();
+
+        key.set_kty(Some(EC2));
+        assert!(key.verify_curve().is_err());
+
+        key.set_crv(Some(ED25519));
+        assert!(key.verify_curve().is_err());
+
+        key.set_crv(Some(P_256));
+        key.verify_curve().unwrap();
+
+        key.set_kty(Some(OKP));
+        assert!(key.verify_curve().is_err());
+
+        key.set_crv(Some(P_256));
+        assert!(key.verify_curve().is_err());
+
+        key.set_crv(Some(ED25519));
+        key.verify_curve().unwrap();
+    }
+
+    #[wasm_bindgen_test]
+    fn verify_kty() {
+        let mut key = CoseKey::new();
+        key.set_kty(None);
+        assert!(key.verify_kty().is_err());
+
+        key.set_kty(Some(0));
+        assert!(key.verify_kty().is_err());
+
+        key.set_kty(Some(RSA));
+        key.verify_kty().unwrap();
+    }
+
+    #[wasm_bindgen_test]
+    fn verify_key_ops() {
+        let mut key = CoseKey::new();
+        key.set_kty(Some(SYMMETRIC));
+        key.set_key_ops(vec![KEY_OPS_ENCRYPT]);
+        assert!(key.verify_key_ops().is_err());
+
+        key.set_x(Some(vec![]));
+        assert!(key.verify_key_ops().is_err());
+
+        key.set_x(None);
+        key.set_y(Some(vec![]));
+        assert!(key.verify_key_ops().is_err());
+
+        key.set_y(None);
+        key.set_d(Some(vec![]));
+        assert!(key.verify_key_ops().is_err());
+
+        key.set_d(None);
+        key.set_k(Some(vec![]));
+        key.verify_key_ops().unwrap();
+    }
+
+    #[wasm_bindgen_test]
+    fn key_ops_ec2_okp() {
+        let mut key = CoseKey::new();
+        key.set_kty(Some(EC2));
+        key.set_key_ops(vec![KEY_OPS_VERIFY]);
+        assert!(key.verify_key_ops().is_err());
+        key.set_x(Some(vec![]));
+        assert!(key.verify_key_ops().is_err());
+        key.set_crv(Some(P_256));
+        assert!(key.verify_key_ops().is_err());
+        key.set_kty(Some(OKP));
+        key.verify_key_ops().unwrap();
+        key.set_kty(Some(EC2));
+        key.set_y(Some(vec![]));
+        key.verify_key_ops().unwrap();
+        key.set_y_parity(Some(false));
+        key.verify_key_ops().unwrap();
+
+        key = CoseKey::new();
+        key.set_kty(Some(EC2));
+        key.set_key_ops(vec![KEY_OPS_SIGN]);
+        assert!(key.verify_key_ops().is_err());
+        key.set_d(Some(vec![]));
+        assert!(key.verify_key_ops().is_err());
+        key.set_crv(Some(P_256));
+        key.verify_key_ops().unwrap();
+        key.set_x(Some(vec![]));
+        key.set_y(Some(vec![]));
+        key.verify_key_ops().unwrap();
+    }
+
+    #[wasm_bindgen_test]
+    fn verify_key_ops_rsa() {
+        let mut key = CoseKey::new();
+        key.set_kty(Some(RSA));
+        key.set_key_ops(vec![KEY_OPS_VERIFY]);
+        key.set_n(Some(vec![]));
+        key.set_e(Some(vec![]));
+        key.verify_key_ops().unwrap();
+        key.set_rsa_d(Some(vec![]));
+        assert!(key.verify_key_ops().is_err());
+        key.set_rsa_d(None);
+        key.verify_key_ops().unwrap();
+        key.add_other_prime(vec![], vec![], vec![]);
+        assert!(key.verify_key_ops().is_err());
+
+        key = CoseKey::new();
+        key.set_kty(Some(RSA));
+        key.set_key_ops(vec![KEY_OPS_SIGN]);
+        assert!(key.verify_key_ops().is_err());
+        key.set_n(Some(vec![]));
+        key.set_e(Some(vec![]));
+        key.set_rsa_d(Some(vec![]));
+        key.set_p(Some(vec![]));
+        key.set_q(Some(vec![]));
+        key.set_dp(Some(vec![]));
+        key.set_qinv(Some(vec![]));
+        assert!(key.verify_key_ops().is_err());
+        key.set_dq(Some(vec![]));
+        key.verify_key_ops().unwrap();
+        key.add_other_prime(vec![], vec![], vec![]);
+        key.verify_key_ops().unwrap();
+    }
+
+    #[wasm_bindgen_test]
+    fn duplicate_label() {
+        let mut key = CoseKey::new();
+
+        let bytes = hex::decode("a601032041002041062541002141002881a32941002a41012b4102").unwrap();
+        key.set_bytes(bytes.clone());
+        assert_eq!(key.decode(), Err("Duplicate Label -1".into()));
+    }
+
+    #[wasm_bindgen_test]
+    fn invalid_label() {
+        let mut key = CoseKey::new();
+
+        let bytes =
+            hex::decode("a6010320410039138741062541002141002881a32941002a41012b4102").unwrap();
+        key.set_bytes(bytes.clone());
+        assert_eq!(key.decode(), Err("Invalid Label -5000".into()));
+    }
+
+    #[wasm_bindgen_test]
+    fn encode_decode_key_keyset() {
+        let key_set = hex::decode(include_str!("../test_params/pub_key_set").trim()).unwrap();
+        let mut cose_ks = CoseKeySet::new();
+        cose_ks.set_bytes(key_set.clone());
+        cose_ks.decode().unwrap();
+
+        let mut cose_ks_ver = CoseKeySet::new();
+        for mut key in cose_ks.keys() {
+            let mut key_ver = CoseKey::new();
+            key.encode().unwrap();
+            key_ver.set_bytes(key.bytes);
+            key_ver.decode().unwrap();
+            cose_ks_ver.add_key(&key_ver);
+        }
+        cose_ks_ver.encode().unwrap();
+        assert_eq!(cose_ks_ver.bytes, key_set);
+    }
+}

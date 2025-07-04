@@ -382,3 +382,108 @@ impl CoseAgent {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod test_vecs {
+    use crate::agent;
+    use crate::algs;
+    use crate::headers;
+    use crate::keys;
+    use crate::message::CoseMessage;
+    use wasm_bindgen_test::*;
+
+    pub fn get_test_vec(id: &str) -> Vec<u8> {
+        let test_vecs = include_str!("../test_params/test_vecs.csv");
+        let mut msg = vec![];
+        for line in test_vecs.lines().skip(1) {
+            let kp: Vec<&str> = line.split(',').map(|s| s.trim()).collect();
+            if kp[0] == id {
+                msg = hex::decode(kp[1]).unwrap();
+            }
+        }
+        msg
+    }
+
+    pub fn get_key(kid: Vec<u8>, public: bool) -> keys::CoseKey {
+        let key_set;
+        if public {
+            key_set = include_str!("../test_params/pub_key_set");
+        } else {
+            key_set = include_str!("../test_params/priv_key_set");
+        }
+        let mut cose_ks = keys::CoseKeySet::new();
+        cose_ks.set_bytes(hex::decode(key_set.trim()).unwrap());
+        cose_ks.decode().unwrap();
+        cose_ks.get_key(kid).unwrap()
+    }
+
+    #[wasm_bindgen_test]
+    fn c13_external_counter_sig() {
+        let kid = b"11".to_vec();
+        let mut verify = CoseMessage::new_sign();
+        verify.set_bytes(get_test_vec("C13"));
+
+        verify.init_decoder(None).unwrap();
+        let i = verify.get_agent(kid.clone()).unwrap()[0];
+        let key = get_key(kid, true);
+        verify.set_agent_key(i, &key).unwrap();
+
+        verify.decode(None, Some(i)).unwrap();
+
+        let to_verify = verify.get_to_verify(None, 0, None).unwrap();
+        algs::verify(
+            algs::ES256,
+            Some(keys::P_256),
+            &key.get_pub_key().unwrap(),
+            &to_verify,
+            &verify.header.counters[0].payload,
+        )
+        .unwrap();
+    }
+
+    #[wasm_bindgen_test]
+    fn prod_c13_external_counter_sig() {
+        let kid = b"11".to_vec();
+        let payload = b"This is the content.".to_vec();
+        let mut sign = CoseMessage::new_sign();
+        sign.set_payload(payload);
+
+        let mut header = headers::CoseHeader::new();
+        header.set_kid(kid.clone(), false, false);
+        header.set_alg(algs::ES256, true, false);
+
+        let key = get_key(kid.clone(), false);
+
+        let mut agent = agent::CoseAgent::new();
+        agent.set_header(header);
+        agent.key(&key).unwrap();
+
+        sign.add_agent(&mut agent).unwrap();
+        sign.secure_content(None).unwrap();
+
+        let mut counter = agent::CoseAgent::new_counter_sig();
+
+        let mut header = headers::CoseHeader::new();
+        header.set_kid(kid, false, false);
+        header.set_alg(algs::ES256, true, false);
+
+        counter.set_header(header);
+
+        let to_sign = sign.get_to_sign(None, &mut counter, None).unwrap();
+
+        let payload = algs::sign(
+            algs::ES256,
+            Some(keys::P_256),
+            &key.get_s_key().unwrap(),
+            &to_sign,
+        )
+        .unwrap();
+
+        counter.add_signature(payload).unwrap();
+
+        sign.add_counter_sig(counter, None).unwrap();
+
+        let bytes = sign.encode(true).unwrap();
+        assert_eq!(bytes, get_test_vec("C13"));
+    }
+}
