@@ -18,9 +18,7 @@ Module to encode/decode COSE messages.
 | `header` | [CoseHeader](CoseHeader.md) | Yes | Yes | COSE header object of the message. | 
 | `bytes` | `Uint8Array` | Yes | Yes | Final encoded message in bytes. | 
 | `payload` | `Uint8Array` | Yes | Yes | Payload of the message in bytes. | 
-| `agents` | `Vec<`[CoseAgent](CoseAgent.md)`>` | Yes | No | Cose Agents (Recipient | Signer |
-Counter Signer) of the message (This is returns just a copy of the agents data due to the WASM 
-limitations). | 
+| `agents` | `Vec<`[CoseAgent](CoseAgent.md)`>` | Yes | No | Cose Agents (Recipient | Signer | Counter Signer) of the message (This is returns just a copy of the agents data due to the WASM limitations). | 
 
 
 When decoding a COSE message, after the function `init_decoding`, all the COSE message parameters will be accessible by the previously listed getters.
