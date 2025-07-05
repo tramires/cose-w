@@ -222,7 +222,7 @@ mod test_vecs {
         let mut key1 = get_key(b"peregrin.took@tuckborough.example".to_vec(), false);
         key1.set_y_parity(Some(true));
 
-        agent.ephemeral_key(key1, false, false);
+        agent.ephemeral_key(&key1, false, false);
         agent.header.set_kid(kid, false, false);
 
         enc.add_agent(&mut agent).unwrap();
@@ -352,7 +352,7 @@ mod test_vecs {
 
         agent.header.set_static_kid(
             b"peregrin.took@tuckborough.example".to_vec(),
-            key1,
+            &key1,
             false,
             false,
         );
@@ -367,31 +367,17 @@ mod test_vecs {
         let mut expected = get_test_vec("C34");
 
         // Remove ciphertext and cek (probabilistic) for comparison
-        let mut prob = vec![
-            100, 248, 77, 145, 59, 166, 10, 118, 7, 10, 154, 72, 242, 110, 151, 232, 99, 226, 133,
-            41, 216, 245, 51, 94, 95, 1, 101, 238, 233, 118, 180, 165, 246, 198, 240, 157,
-        ];
+        let mut prob_len = 36;
+        let mut prob_index = 24;
 
-        let mut index = expected
-            .windows(prob.len())
-            .position(|window| window == &prob)
-            .unwrap();
+        expected.drain(prob_index..prob_index + prob_len);
+        output.drain(prob_index..prob_index + prob_len);
 
-        expected.drain(index..index + prob.len());
-        output.drain(index..index + prob.len());
+        prob_len = 24;
+        prob_index = 113;
 
-        prob = vec![
-            65, 224, 215, 111, 87, 157, 189, 13, 147, 106, 102, 45, 84, 216, 88, 32, 55, 222, 46,
-            54, 111, 222, 28, 98,
-        ];
-
-        index = expected
-            .windows(prob.len())
-            .position(|window| window == &prob)
-            .unwrap();
-
-        expected.drain(index..index + prob.len());
-        output.drain(index..index + prob.len());
+        expected.drain(prob_index..prob_index + prob_len);
+        output.drain(prob_index..prob_index + prob_len);
 
         assert_eq!(output, expected);
     }
@@ -539,7 +525,7 @@ mod test_vecs {
 
         header.set_static_kid(
             b"peregrin.took@tuckborough.example".to_vec(),
-            key1,
+            &key1,
             false,
             false,
         );
@@ -607,27 +593,17 @@ mod test_vecs {
         let mut expected = get_test_vec("C53");
 
         // Remove probabilistic
-        let mut prob = vec![54, 245, 175, 175, 11, 171, 93, 67];
-        let mut index = expected
-            .windows(prob.len())
-            .position(|window| window == &prob)
-            .unwrap();
+        let mut prob_len = 8;
+        let mut prob_index = 30;
 
-        expected.drain(index..index + prob.len());
-        bytes.drain(index..index + prob.len());
+        expected.drain(prob_index..prob_index + prob_len);
+        bytes.drain(prob_index..prob_index + prob_len);
 
-        prob = vec![
-            113, 26, 176, 220, 47, 196, 88, 93, 206, 39, 239, 250, 103, 129, 200, 9, 62, 186, 144,
-            111, 34, 123, 110, 176,
-        ];
+        prob_len = 24;
+        prob_index = 77;
 
-        index = expected
-            .windows(prob.len())
-            .position(|window| window == &prob)
-            .unwrap();
-
-        expected.drain(index..index + prob.len());
-        bytes.drain(index..index + prob.len());
+        expected.drain(prob_index..prob_index + prob_len);
+        bytes.drain(prob_index..prob_index + prob_len);
 
         assert_eq!(bytes, expected);
     }
@@ -719,29 +695,11 @@ mod test_vecs {
         let mut expected = get_test_vec("RSA_PSS_01");
 
         // Remove probabilistic
-        let prob = vec![
-            58, 212, 2, 112, 116, 152, 153, 149, 242, 94, 22, 127, 153, 201, 180, 9, 111, 220, 92,
-            36, 45, 67, 141, 48, 56, 42, 231, 179, 15, 131, 200, 141, 91, 94, 190, 203, 100, 210,
-            37, 109, 88, 211, 204, 229, 196, 125, 52, 59, 250, 83, 43, 17, 124, 45, 4, 223, 63,
-            178, 6, 121, 169, 156, 243, 85, 90, 125, 174, 96, 152, 189, 18, 59, 15, 52, 65, 161,
-            229, 14, 137, 124, 186, 161, 177, 124, 225, 113, 235, 171, 32, 174, 46, 16, 241, 109,
-            110, 233, 24, 211, 122, 241, 2, 23, 89, 121, 190, 101, 235, 206, 222, 180, 117, 25, 52,
-            110, 163, 237, 109, 19, 181, 116, 27, 198, 55, 66, 174, 49, 52, 43, 16, 180, 111, 233,
-            63, 57, 181, 95, 221, 110, 50, 18, 143, 216, 180, 118, 254, 216, 143, 103, 31, 48, 77,
-            9, 67, 210, 199, 163, 59, 206, 72, 223, 8, 225, 248, 144, 207, 90, 205, 163, 239, 70,
-            218, 33, 152, 28, 58, 104, 124, 255, 248, 94, 235, 39, 106, 152, 97, 47, 56, 214, 238,
-            99, 100, 72, 89, 214, 106, 154, 212, 153, 57, 234, 41, 15, 122, 159, 223, 237, 154,
-            241, 36, 105, 48, 245, 34, 203, 140, 105, 9, 86, 125, 203, 226, 114, 151, 22, 203, 24,
-            163, 30, 111, 35, 29, 179, 214, 154, 122, 67, 42, 163, 214, 250, 29, 239, 156, 150, 89,
-            97, 107, 235, 98, 111, 21, 131, 120, 224, 251, 221,
-        ];
-        let index = expected
-            .windows(prob.len())
-            .position(|window| window == &prob)
-            .unwrap();
+        let prob_len = 256;
+        let prob_index = 74;
 
-        expected.drain(index..index + prob.len());
-        output.drain(index..index + prob.len());
+        expected.drain(prob_index..prob_index + prob_len);
+        output.drain(prob_index..prob_index + prob_len);
 
         assert_eq!(output, expected);
     }
@@ -796,42 +754,17 @@ mod test_vecs {
         let mut expected = get_test_vec("RSA_OAEP_01");
 
         // Remove probabilistic
-        let mut prob = vec![
-            97, 60, 139, 83, 165, 187, 205, 58, 121, 241, 49, 76, 102, 140, 185, 238, 253, 54, 44,
-            26, 120, 254, 88, 172, 47, 118, 80, 185, 244, 34, 132, 222, 221, 246, 32, 28,
-        ];
-        let mut index = expected
-            .windows(prob.len())
-            .position(|window| window == &prob)
-            .unwrap();
+        let mut prob_index = 24;
+        let mut prob_len = 36;
 
-        expected.drain(index..index + prob.len());
-        output.drain(index..index + prob.len());
+        expected.drain(prob_index..prob_index + prob_len);
+        output.drain(prob_index..prob_index + prob_len);
 
-        prob = vec![
-            121, 148, 20, 19, 104, 197, 254, 24, 211, 199, 92, 41, 109, 132, 179, 30, 209, 189, 11,
-            157, 205, 178, 233, 195, 187, 223, 74, 25, 145, 36, 208, 62, 81, 113, 224, 155, 249, 0,
-            153, 57, 108, 52, 111, 166, 45, 44, 46, 84, 116, 17, 105, 251, 47, 202, 0, 171, 231,
-            38, 206, 12, 79, 85, 34, 30, 122, 99, 0, 29, 57, 194, 2, 110, 238, 138, 249, 211, 178,
-            232, 233, 112, 132, 198, 51, 71, 14, 50, 151, 77, 101, 193, 224, 70, 168, 19, 25, 248,
-            208, 67, 22, 113, 13, 160, 96, 245, 241, 162, 173, 48, 74, 34, 11, 126, 155, 17, 248,
-            107, 9, 193, 104, 153, 53, 3, 149, 25, 243, 104, 173, 108, 214, 224, 21, 68, 135, 233,
-            35, 192, 222, 67, 26, 234, 100, 37, 119, 71, 54, 253, 237, 230, 102, 242, 72, 161, 54,
-            179, 160, 143, 99, 32, 140, 234, 250, 205, 233, 246, 30, 76, 255, 138, 195, 10, 97,
-            160, 224, 36, 178, 139, 123, 75, 15, 119, 194, 84, 124, 86, 82, 240, 126, 247, 97, 167,
-            90, 65, 147, 185, 137, 250, 92, 53, 230, 169, 41, 124, 214, 137, 82, 40, 200, 229, 178,
-            85, 154, 155, 125, 217, 151, 117, 60, 186, 234, 104, 72, 51, 126, 32, 15, 240, 248, 4,
-            42, 165, 139, 117, 131, 159, 121, 255, 239, 60, 58, 127, 74, 185, 222, 84, 90, 123, 6,
-            70, 223, 153, 144, 143, 44, 138, 128, 244,
-        ];
+        prob_index = 68;
+        prob_len = 256;
 
-        index = expected
-            .windows(prob.len())
-            .position(|window| window == &prob)
-            .unwrap();
-
-        expected.drain(index..index + prob.len());
-        output.drain(index..index + prob.len());
+        expected.drain(prob_index..prob_index + prob_len);
+        output.drain(prob_index..prob_index + prob_len);
 
         assert_eq!(output, expected);
     }

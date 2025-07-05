@@ -140,6 +140,10 @@ impl CoseMessage {
     pub fn set_payload(&mut self, payload: Vec<u8>) {
         self.payload = payload;
     }
+    #[wasm_bindgen(getter)]
+    pub fn agents(&self) -> Vec<CoseAgent> {
+        self.agents.clone()
+    }
     pub fn counters_len(&self, agent: Option<usize>) -> usize {
         match agent {
             Some(v) => self.agents[v].header.counters.len(),
@@ -629,12 +633,14 @@ impl CoseMessage {
                         return Err(JsValue::from("Key op not supported"));
                     } else {
                         if self.context == ENC {
-                            self.secured = self.agents[0].enc(
-                                &self.payload,
-                                &aead,
-                                &self.ph_bstr,
+                            self.secured = cose_struct::gen_cipher(
+                                &self.agents[0].s_key,
                                 &alg,
                                 self.header.iv.as_ref().ok_or(JsValue::from("Missing IV"))?,
+                                &aead,
+                                cose_struct::ENCRYPT,
+                                &self.ph_bstr,
+                                &self.payload,
                             )?;
                             self.agents[0].enc = true;
                             return Ok(());

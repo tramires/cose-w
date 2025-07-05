@@ -40,7 +40,7 @@ label is to be included in the COSE `crit` array.
 | `set_iv(iv: Uint8Array, prot: bool, crit: bool)` | `iv`: Initialization Vector. | --- | Sets the Initialization Vector. | 
 | `set_partial_iv(iv: Uint8Array, prot: bool, crit: bool)` | `iv`: Partial Initialization Vector. | --- | Sets the Partial Initialization Vector. | 
 | `set_salt(salt: Uint8Array, prot: bool, crit: bool)` | `salt`: Salt. | --- | Sets the Salt. | 
-| `set_party_identity(identity: Uint8Array, prot: bool, crit: bool, u: bool)` | `identity`: COSE Party Identity. <br/> `u`: If its Party U or V. | --- | Sets the COSE Party U or V identity. | 
+| `set_party_identity(identity: Uint8Array, prot: bool, crit: bool, u: bool, include: bool)` | `identity`: COSE Party Identity. <br/> `u`: If its Party U or V. <br/> `include`: If its to be included in the COSE message or not. | --- | Sets the COSE Party U or V identity. | 
 | `set_party_nonce(nonce: Uint8Array, prot: bool, crit: bool, u: bool)` | `nonce`: COSE Party Nonce. <br/> `u`: If its Party U or V. | --- | Sets the COSE Party U or V Nonce. | 
 | `set_party_other(other: Uint8Array, prot: bool, crit: bool, u: bool)` | `other`: COSE Party Other. <br/> `u`: If its Party U or V. | --- | Sets the COSE Party U or V Other. | 
 | `ephemeral_key(key: CoseKey, prot: bool, crit: bool)` | `key`: COSE Key. | --- | Sets the COSE Ephemeral Key for Direct Key Agreement. | 

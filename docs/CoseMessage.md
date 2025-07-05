@@ -18,6 +18,9 @@ Module to encode/decode COSE messages.
 | `header` | [CoseHeader](CoseHeader.md) | Yes | Yes | COSE header object of the message. | 
 | `bytes` | `Uint8Array` | Yes | Yes | Final encoded message in bytes. | 
 | `payload` | `Uint8Array` | Yes | Yes | Payload of the message in bytes. | 
+| `agents` | `Vec<`[CoseAgent](CoseAgent.md)`>` | Yes | No | Cose Agents (Recipient | Signer |
+Counter Signer) of the message (This is returns just a copy of the agents data due to the WASM 
+limitations). | 
 
 
 When decoding a COSE message, after the function `init_decoding`, all the COSE message parameters will be accessible by the previously listed getters.
@@ -68,13 +71,20 @@ Methods for COSE messages with counter signatures:
 
 # Examples 
 
-Examples of single recipient messages (cose-sign1, cose-mac0 and cose-encrypt0) can be seen in [here](README.md).
+- cose-sign (Multiple signers COSE Sign message): [Encode](#ecose-sign) and [Decode](#dcose-sign)
+- cose-encrypt (Multiple recipients COSE Encrypt message w/ Direct Key): [Encode](#ecose-encrypt) and [Decode](#dcose-encrypt)
+- cose-mac (Multiple recipients COSE MAC message w/ ECDH): [Encode](#ecose-mac) and [Decode](#dcose-mac)
+- Counter Signature: [Encode](#ecounter) and [Decode](#dcounter) 
+- Counter Signature (Externally signed/verified): [Encode](#ecounter_e) and [Decode](#dcounter_e) 
+
+Examples of single recipient messages (cose-sign1, cose-mac0 and cose-encrypt0) can be seen
+[here](README.md).
 
 ## cose-sign
 
 Encode/decode cose-sign.
 
-### Encode cose-sign 
+### Encode cose-sign [#ecose-sign]
 ```js
 var {
   CoseKey,
@@ -87,45 +97,42 @@ var {
   KeyOp
 } = require('cose-w');
 
-// Message to sign, "This is the content."
-let msg = Buffer.from('546869732069732074686520636F6E74656E742E', 'hex');
-
-// Prepare signer 1 cose-key
-let key1 = new CoseKey();
-key1.kty = Kty.ec2;
-key1.alg = Alg.es256;
-key1.crv = Crv.p_256;
-key1.d = Buffer.from('57c92077664146e876760c9520d054aa93c3afb04e306705db6090308507b4d3', 'hex');
-key1.key_ops = [KeyOp.sign];
-
-// Prepare signer2 cose-key
-let key2 = new CoseKey();
-key2.kty = Kty.ec2;
-key2.alg = Alg.es256;
-key2.crv = Crv.p_256;
-key2.d = Buffer.from('57c92077664146e876760c9520d054aa93c3afb04e306705db6090308507b4d3', 'hex');
-key2.key_ops = [KeyOp.sign];
+let msg = Buffer.from('This is the content.', 'utf8');
 
 // Prepare CoseSign
 let sign = CoseMessage.new_sign();
 sign.payload = msg;
 
+let key = new CoseKey();
+
 // Add signer 1
 let signer1 = new CoseAgent();
+
+key.bytes = Buffer.from("A601020258246D65726961646F632E6272616E64796275636B406275636B6C616E642E6578616D706C65200121582065EDA5A12577C2BAE829437FE338701A10AAA375E1BB5B5DE108DE439C08551D2258201E52ED75701163F7F9E40DDF9F341B3DC9BA860AF7E0CA7CA7E9EECD0084D19C235820AFF907C99F9AD3AAE6C4CDF21122BCE2BD68B5283E6907154AD911840FA208CF", "hex");
+key.decode();
+
 let header = new CoseHeader();
 header.set_alg(Alg.es256, true, false);
-header.set_kid([1], true, false);
+header.set_kid(key.kid, true, false);
 signer1.header = header;
-signer1.key(key1);
+
+signer1.key(key);
+
 sign.add_agent(signer1);
 
 // Add signer 2
 let signer2 = new CoseAgent();
+
+key.bytes = Buffer.from("A60102024231312001215820BAC5B11CAD8F99F9C72B05CF4B9E26D244DC189F745228255A219A86D6A09EFF22582020138BF82DC1B6D562BE0FA54AB7804A3A64B6D72CCFED6B6FB6ED28BBFC117E23582057C92077664146E876760C9520D054AA93C3AFB04E306705DB6090308507B4D3", "hex");
+key.decode();
+
 header = new CoseHeader();
 header.set_alg(Alg.es256, true, false);
-header.set_kid([2], true, false);
+header.set_kid(key.kid, true, false);
 signer2.header = header;
-signer2.key(key2);
+
+signer2.key(key);
+
 sign.add_agent(signer2);
 
 // Generate signature and encode cose-sign message
@@ -133,7 +140,7 @@ sign.secure_content(null);
 let bytes = sign.encode(true);
 ```
 
-### Decode cose-sign 
+### Decode cose-sign [#dcose-sign]
 ```js
 var {
   CoseKey,
@@ -144,118 +151,73 @@ var {
   KeyOp
 } = require('cose-w');
 
-// Prepare signer 1 cose-key
 let key1 = new CoseKey();
-key1.kty = Kty.ec2;
-key1.alg = Alg.es256;
-key1.crv = Crv.p_256;
-key1.x = Buffer.from('bac5b11cad8f99f9c72b05cf4b9e26d244dc189f745228255a219a86d6a09eff', 'hex');
-key1.y = Buffer.from('20138bf82dc1b6d562be0fa54ab7804a3a64b6d72ccfed6b6fb6ed28bbfc117e', 'hex');
-key1.key_ops = [KeyOp.verify];
+key1.bytes = Buffer.from("A601020258246D65726961646F632E6272616E64796275636B406275636B6C616E642E6578616D706C65200121582065EDA5A12577C2BAE829437FE338701A10AAA375E1BB5B5DE108DE439C08551D2258201E52ED75701163F7F9E40DDF9F341B3DC9BA860AF7E0CA7CA7E9EECD0084D19C235820AFF907C99F9AD3AAE6C4CDF21122BCE2BD68B5283E6907154AD911840FA208CF", "hex");
+key1.decode();
 
-// Prepare signer2 cose-key
 let key2 = new CoseKey();
-key2.kty = Kty.ec2;
-key2.alg = Alg.es256;
-key2.crv = Crv.p_256;
-key2.x = Buffer.from('bac5b11cad8f99f9c72b05cf4b9e26d244dc189f745228255a219a86d6a09eff', 'hex');
-key2.y = Buffer.from('20138bf82dc1b6d562be0fa54ab7804a3a64b6d72ccfed6b6fb6ed28bbfc117e', 'hex');
-key2.key_ops = [KeyOp.verify];
+key2.bytes = Buffer.from("A60102024231312001215820BAC5B11CAD8F99F9C72B05CF4B9E26D244DC189F745228255A219A86D6A09EFF22582020138BF82DC1B6D562BE0FA54AB7804A3A64B6D72CCFED6B6FB6ED28BBFC117E23582057C92077664146E876760C9520D054AA93C3AFB04E306705DB6090308507B4D3", "hex");
+key2.decode();
 
 // Prepare CoseSign with the cose-sign bytes
 let verify = CoseMessage.new_sign();
-verify.bytes = Buffer.from("d8628440a054546869732069732074686520636f6e74656e742e828346a20126044101a058408d53d4fd916a66c7e93979c0d68938045b35902ab0ae880c503be2830d4c99af187519115debf9e4f54475a2c71c6e6042f4b7d2bcfef9860487b7a4ae36d2cf8346a20126044102a05840ea1664340920c3eff80c6d97c7896b2e42992afa461b734f04bbd33d4237e96f320f1dfdef3cb8f8979456e4dc931403e74d88fc4af77fc9ec5264a27f30a022", "hex");
+verify.bytes = Buffer.from("d8628440a054546869732069732074686520636f6e74656e742e8283582aa201260458246d65726961646f632e6272616e64796275636b406275636b6c616e642e6578616d706c65a05840b0714b778d405c76414fdefbc6499459a76a9f3741326b5b961ac7b87bf1f705697e5789eddb3ed722ca76eb125654b2a8b9f2135d2869bf4b97ddd90f16c5ab8347a2012604423131a058401234cb1cf8ca3ef16e78233a9e46192a17f7c70dbac76c7721f5a4da759ae1c3ccda943ecc62d12668a261550cc4bf39046f484f99ab9526c7916c09d189c0c1", "hex");
 
 // Init decoding
 verify.init_decoder(null);
 
+
 // Get signer 1 and verify
-let signer1_i = verify.get_agent([1])[0];
-verify.set_agent_key(signer1_i, key1);
-verify.decode(null, signer1_i);
+let signer1_index = verify.get_agent(key1.kid)[0];
+verify.set_agent_key(signer1_index, key1);
+let payload = verify.decode(null, signer1_index);
 
 // Get signer 2 and verify
-let signer2_i = verify.get_agent([2])[0];
-verify.set_agent_key(signer2_i, key2);
-let payload = verify.decode(null, signer2_i);
+let signer2_index = verify.get_agent(key2.kid)[0];
+verify.set_agent_key(signer2_index, key2);
+payload = verify.decode(null, signer2_index);
 ```
 
 ## cose-encrypt
 
-Encode/decode cose-encrypt.
+Encode/decode cose-encrypt with Direct Key.
 
-### Encode cose-encrypt
+### Encode cose-encrypt [#ecose-encrypt]
 ```js
-var {
-  CoseKey,
-  CoseMessage,
-  CoseHeader,
-  CoseAgent,
-  Alg,
-  Kty,
-  Crv,
-  KeyOp
-} = require('cose-w');
-
-// Message to encrypt, "This is the content."
-let msg = Buffer.from('546869732069732074686520636F6E74656E742E', 'hex');
-
-// Prepare recipient 1 cose-key
-let key1 = new CoseKey();
-key1.kty = Kty.symmetric;
-key1.alg = Alg.a128kw;
-key1.k = Buffer.from('849b57219dae48de646d07dbb533566e', 'hex');
-key1.key_ops = [KeyOp.wrap];
-
-// Prepare recipient 2 cose-key
-let key2 = new CoseKey();
-key2.kty = Kty.ec2;
-key2.crv = Crv.p_256;
-key2.x = Buffer.from('98F50A4FF6C05861C8860D13A638EA56C3F5AD7590BBFBF054E1C7B4D91D6280', 'hex');
-key2.y = Buffer.from('F01400B089867804B8E9FC96C3932161F1934F4223069170D924B7E03BF822BB', 'hex');
-
-// Prepare recipient 2 ephemeral ECDH cose-key
-let eph_key2 = new CoseKey();
-eph_key2.kty = Kty.ec2;
-eph_key2.crv = Crv.p_256;
-eph_key2.x = Buffer.from('bac5b11cad8f99f9c72b05cf4b9e26d244dc189f745228255a219a86d6a09eff', 'hex');
-eph_key2.d = Buffer.from('57c92077664146e876760c9520d054aa93c3afb04e306705db6090308507b4d3', 'hex');
-eph_key2.key_ops = [KeyOp.derive];
+let msg = Buffer.from('This is the content.', 'utf8');
 
 // Prepare cose-encrypt header
 let header = new CoseHeader();
-header.set_alg(Alg.a256gcm, true, false);
-header.set_iv(Buffer.from('89f52f65a1c580933b5261a7', 'hex'), true, false);
+header.set_alg(Alg.a128gcm, true, false);
+header.set_iv(Buffer.from('89f52f65a1c580933b5261a7', 'hex'), false, false);
 
 // Prepare CoseEncrypt
 let enc = CoseMessage.new_encrypt();
 enc.header = header;
 enc.payload = msg;
 
-// Add recipient 1
-let recipient1 = new CoseAgent();
-header = new CoseHeader();
-header.set_alg(Alg.a128kw, true, false);
-header.set_kid([0], false, false);
-recipient1.header = header;
-recipient1.key(key1);
-enc.add_agent(recipient1);
+// Add recipient 
+let recipient = new CoseAgent();
 
-// Add recipient 2
-let recipient2 = new CoseAgent();
+// Prepare recipient cose-key
+let key = new CoseKey();
+key.bytes = Buffer.from("A30104024B6F75722D736563726574322050849B5786457C1491BE3A76DCEA6C4271", "hex");
+key.decode();
+
 header = new CoseHeader();
-header.set_alg(Alg.ecdh_es_a128kw, true, false);
-header.set_kid([1], false, false);
-recipient2.header = header;
-recipient2.key(key2);
-recipient2.ephemeral_key(eph_key2, true, false);
-enc.add_agent(recipient2);
+header.set_alg(Alg.direct, false, false);
+header.set_kid(key.kid, false, false);
+recipient.header = header;
+
+recipient.key(key);
+
+enc.add_agent(recipient);
 
 // Gen ciphertext and encode
 enc.secure_content(null);
 let bytes = enc.encode(true);
 ```
-### Decode cose-encrypt
+### Decode cose-encrypt [#dcose-encrypt]
 ```js
 var {
   CoseKey,
@@ -268,41 +230,27 @@ var {
 var assert = require('assert');
 
 // Expected messsage to decrypt
-let expected_msg = Buffer.from('546869732069732074686520636F6E74656E742E', 'hex');
-
-// Prepare recipient 1 cose-key
-let key1 = new CoseKey();
-key1.kty = Kty.symmetric;
-key1.alg = Alg.a128kw;
-key1.k = Buffer.from('849b57219dae48de646d07dbb533566e', 'hex');
-key1.key_ops = [KeyOp.unwrap];
-
-// Prepare recipient 2 cose-key
-let key2 = new CoseKey();
-key2.kty = Kty.ec2;
-key2.crv = Crv.p_256;
-key2.d = Buffer.from('02D1F7E6F26C43D4868D87CEB2353161740AACF1F7163647984B522A848DF1C3', 'hex');
-key2.key_ops = [KeyOp.derive];
+let expected_msg = Buffer.from('This is the content.', 'utf8');
 
 // Prepare CoseEncrypt with the cose-encrypt bytes
 let dec = CoseMessage.new_encrypt();
-dec.bytes = Buffer.from("d8608451a20103054c89f52f65a1c580933b5261a7a05824b405d0fdca0bc1cad073275e402933c19e198d4d8b69c6cbceef55c231becbe8a7d5604e828343a10122a10441005828bc703be59088671a557a928670186af85da2157a7b1d23cf0c0c53ee89c7819028eb343c29545a8f835832a201381c20a5010203262001215820bac5b11cad8f99f9c72b05cf4b9e26d244dc189f745228255a219a86d6a09eff048107a1044101582813e5bf1bc51a20fed5b199dd0d8cbeaaf899ab272a52794b0e46a94f66a413cb21c7c15d632c7169", "hex");
+dec.bytes = Buffer.from("d8608443a10101a1054c89f52f65a1c580933b5261a75824b148914af99b365b06a29477e0fbd05a57acf3f987392a3d49818c394fa4771bdb2c2fc5818340a20125044b6f75722d7365637265743240", "hex");
 
 // Init decoding
 dec.init_decoder(null);
 
+assert.strictEqual(dec.agents.length, 1);
+
+let key = new CoseKey();
+key.bytes = Buffer.from("A30104024B6F75722D736563726574322050849B5786457C1491BE3A76DCEA6C4271", "hex");
+key.decode();
+
 // Get recipient 1 and decrypt
-let recipient1_i = dec.get_agent([0])[0];
-let info = dec.agent_header(recipient1_i);
-dec.set_agent_key(recipient1_i, key1);
-let msg = dec.decode(null, recipient1_i);
-assert.deepEqual(Buffer.from(msg).toString(), expected_msg.toString());
+let recipient_index = dec.get_agent(key.kid)[0];
 
+dec.set_agent_key(recipient_index, key);
 
-// Get recipient 2 and decrypt
-let recipient2_i = dec.get_agent([1])[0];
-dec.set_agent_key(recipient2_i, key2);
-msg = dec.decode(null, recipient2_i);
+let msg = dec.decode(null, recipient_index);
 assert.deepEqual(Buffer.from(msg).toString(), expected_msg.toString());
 ```
 
@@ -310,7 +258,8 @@ assert.deepEqual(Buffer.from(msg).toString(), expected_msg.toString());
 
 Encode/decode cose-mac.
 
-### Encode cose-mac
+### Encode cose-mac [#ecose-mac]
+
 ```js
 var {
   CoseKey,
@@ -323,30 +272,7 @@ var {
   KeyOp
 } = require('cose-w');
 
-// Message to MAC, "This is the content."
-let msg = Buffer.from('546869732069732074686520636F6E74656E742E', 'hex');
-
-// Prepare recipient 1 cose-key
-let key1 = new CoseKey();
-key1.kty = Kty.symmetric;
-key1.alg = Alg.a128kw;
-key1.k = Buffer.from('849b57219dae48de646d07dbb533566e', 'hex');
-key1.key_ops = [KeyOp.wrap, KeyOp.unwrap];
-
-// Prepare recipient 2 cose-key
-let key2 = new CoseKey();
-key2.kty = Kty.ec2;
-key2.crv = Crv.p_256;
-key2.x = Buffer.from('98F50A4FF6C05861C8860D13A638EA56C3F5AD7590BBFBF054E1C7B4D91D6280', 'hex');
-key2.y = Buffer.from('F01400B089867804B8E9FC96C3932161F1934F4223069170D924B7E03BF822BB', 'hex');
-
-// Prepare recipient 2 ephemeral ECDH cose-key
-let eph_key2 = new CoseKey();
-eph_key2.kty = Kty.ec2;
-eph_key2.crv = Crv.p_256;
-eph_key2.x = Buffer.from('bac5b11cad8f99f9c72b05cf4b9e26d244dc189f745228255a219a86d6a09eff', 'hex');
-eph_key2.d = Buffer.from('57c92077664146e876760c9520d054aa93c3afb04e306705db6090308507b4d3', 'hex');
-eph_key2.key_ops = [KeyOp.derive];
+let msg = Buffer.from('This is the content.', 'utf8');
 
 // Prepare cose-mac header
 let header = new CoseHeader();
@@ -358,30 +284,59 @@ let mac = CoseMessage.new_mac();
 mac.header = header;
 mac.payload = msg;
 
-// Add recipient 1
-let recipient1 = new CoseAgent();
-header = new CoseHeader();
-header.set_alg(Alg.a128kw, true, false);
-header.set_kid(Buffer.from("3131", "hex"), false, false);
-recipient1.header = header;
-recipient1.key(key1);
-mac.add_agent(recipient1);
+let key_ecdh_send = new CoseKey();
+key_ecdh_send.bytes = Buffer.from("A6200121582065EDA5A12577C2BAE829437FE338701A10AAA375E1BB5B5DE108DE439C08551D2258201E52ED75701163F7F9E40DDF9F341B3DC9BA860AF7E0CA7CA7E9EECD0084D19C235820AFF907C99F9AD3AAE6C4CDF21122BCE2BD68B5283E6907154AD911840FA208CF01020258246D65726961646F632E6272616E64796275636B406275636B6C616E642E6578616D706C65", "hex");
+key_ecdh_send.decode();
 
-// Add recipient 2
-let recipient2 = new CoseAgent();
+let key_ecdh_rec = new CoseKey();
+key_ecdh_rec.bytes = Buffer.from("A52001215820BAC5B11CAD8F99F9C72B05CF4B9E26D244DC189F745228255A219A86D6A09EFF22582020138BF82DC1B6D562BE0FA54AB7804A3A64B6D72CCFED6B6FB6ED28BBFC117E010202423131", "hex");
+key_ecdh_rec.decode();
+
+// Add recipient ECDH ephemeral
+let recipient_eph = new CoseAgent();
+
 header = new CoseHeader();
 header.set_alg(Alg.ecdh_es_a128kw, true, false);
-header.set_kid(Buffer.from("3232", "hex"), false, false);
-recipient2.header = header;
-recipient2.key(key2);
-recipient2.ephemeral_key(eph_key2, true, false);
-mac.add_agent(recipient2);
+header.set_kid(key_ecdh_rec.kid, false, false);
+recipient_eph.header = header;
+
+recipient_eph.key(key_ecdh_rec);
+recipient_eph.ephemeral_key(key_ecdh_send, true, false);
+
+mac.add_agent(recipient_eph);
+
+// Add recipient ECDH static key
+let recipient_static = new CoseAgent();
+
+header = new CoseHeader();
+header.set_alg(Alg.ecdh_ss_a128kw, true, false);
+header.set_kid(key_ecdh_rec.kid, false, false);
+recipient_static.header = header;
+
+recipient_static.key(key_ecdh_rec);
+recipient_static.static_key(key_ecdh_send, true, false);
+
+mac.add_agent(recipient_static);
+
+// Add recipient ECDH static KID 
+let recipient_skid = new CoseAgent();
+
+header = new CoseHeader();
+header.set_alg(Alg.ecdh_ss_a128kw, true, false);
+header.set_kid(key_ecdh_rec.kid, false, false);
+recipient_skid.header = header;
+
+recipient_skid.key(key_ecdh_rec);
+recipient_skid.static_kid(key_ecdh_send.kid, key_ecdh_send, true, false);
+
+mac.add_agent(recipient_skid);
 
 // Generate tag and encode final message
 mac.secure_content(null);
 let bytes = mac.encode(true);
 ```
-### Decode cose-mac
+
+### Decode cose-mac [#dcose-mac]
 ```js
 var {
   CoseKey,
@@ -392,34 +347,223 @@ var {
   KeyOp
 } = require('cose-w');
 
-// Prepare recipient 1 cose-key
-let key1 = new CoseKey();
-key1.kty = Kty.symmetric;
-key1.alg = Alg.a128kw;
-key1.k = Buffer.from('849b57219dae48de646d07dbb533566e', 'hex');
-key1.key_ops = [KeyOp.unwrap];
+// Prepare sender public key
+let key_ecdh_send = new CoseKey();
+key_ecdh_send.bytes = Buffer.from("A5200121582065EDA5A12577C2BAE829437FE338701A10AAA375E1BB5B5DE108DE439C08551D2258201E52ED75701163F7F9E40DDF9F341B3DC9BA860AF7E0CA7CA7E9EECD0084D19C01020258246D65726961646F632E6272616E64796275636B406275636B6C616E642E6578616D706C65", "hex");
+key_ecdh_send.decode();
 
-// Prepare recipient 2 cose-key
-let key2 = new CoseKey();
-key2.kty = Kty.ec2;
-key2.crv = Crv.p_256;
-key2.d = Buffer.from('02D1F7E6F26C43D4868D87CEB2353161740AACF1F7163647984B522A848DF1C3', 'hex');
-key2.key_ops = [KeyOp.derive];
+// Prepare receiver private key
+let key_ecdh_rec = new CoseKey();
+key_ecdh_rec.bytes = Buffer.from("A62001215820BAC5B11CAD8F99F9C72B05CF4B9E26D244DC189F745228255A219A86D6A09EFF22582020138BF82DC1B6D562BE0FA54AB7804A3A64B6D72CCFED6B6FB6ED28BBFC117E23582057C92077664146E876760C9520D054AA93C3AFB04E306705DB6090308507B4D3010202423131", "hex");
+key_ecdh_rec.decode();
 
 // Prepare CoseMAC with the cose-mac bytes
 let verify = CoseMessage.new_mac();
-verify.bytes = Buffer.from("d8618552a201181a054c89f52f65a1c580933b5261a7a054546869732069732074686520636f6e74656e742e50294e0160dbb25ee48703e918c6051f88828343a10122a10442313158283f27043f090c4d2af4398c10ca06e8d422da75882a58395ffceba7c6357cf031bc5216ba0b566673835832a201381c20a5010203262001215820bac5b11cad8f99f9c72b05cf4b9e26d244dc189f745228255a219a86d6a09eff048107a104423232582864b13f3ac9d8e8b34a40379320d7f757ab992a0ec0cd0436b67af178eb1bf50690fe9d13a854c2c3", "hex");
+verify.bytes = Buffer.from("d8618552a201181a054c89f52f65a1c580933b5261a7a054546869732069732074686520636f6e74656e742e502a0e524fed1d0742b59c1c15cd519ba983835850a201381c20a4200121582065eda5a12577c2bae829437fe338701a10aaa375e1bb5b5de108de439c08551d2258201e52ed75701163f7f9e40ddf9f341b3dc9ba860af7e0ca7ca7e9eecd0084d19c0102a10442313158286b10f4e2b8a95c7b23ebd253d79b5f658e895ffd5edcaea274cf416ef1c24820f6425ae5effc1f1f835877a201381f21a5200121582065eda5a12577c2bae829437fe338701a10aaa375e1bb5b5de108de439c08551d2258201e52ed75701163f7f9e40ddf9f341b3dc9ba860af7e0ca7ca7e9eecd0084d19c01020258246d65726961646f632e6272616e64796275636b406275636b6c616e642e6578616d706c65a1044231315828effd0914890f90b6b6cf99533fcb6726a42b92661bc7594ef78cc8083b328580372503cea33967c483582ba201381f2258246d65726961646f632e6272616e64796275636b406275636b6c616e642e6578616d706c65a104423131582890d7d1cadeb712aa7426e7a7b9ad6554c1e5c79ebfe974c96b64f275c3f3e9fe09aee3ea5b7bc4f1", "hex");
 
 // Init decoding
 verify.init_decoder(null);
 
-// Get recipient 1 and verify tag
-let recipient1_i = verify.get_agent(Buffer.from("3131", "hex"))[0];
-verify.set_agent_key(recipient1_i, key1);
-verify.decode(null, recipient1_i);
+// go through all agents
+for (let i = 0; i < verify.agents.length; i++) {
 
-// Get recipient 2 and verify tag
-let recipient2_i = verify.get_agent(Buffer.from("3232", "hex"))[0];
-verify.set_agent_key(recipient2_i, key2);
-let payload = verify.decode(null, recipient2_i);
+  // If ephemeral
+  if (verify.agents[i].header.alg == Alg.ecdh_es_a128kw) {
+    
+    verify.set_agent_key(i, key_ecdh_rec);
+    let payload = verify.decode(null, i);
+
+  // if static
+  } else if (verify.agents[i].header.alg == Alg.ecdh_ss_a128kw) {
+
+    // if static kid 
+    if (verify.agents[i].header.static_kid) {
+
+      verify.set_agent_key(i, key_ecdh_rec);
+      verify.set_ecdh_key(i, key_ecdh_send);
+      let payload = verify.decode(null, i);
+
+    // if static key
+    } else {
+
+      verify.set_agent_key(i, key_ecdh_rec);
+      let payload = verify.decode(null, i);
+    }
+  }
+}
+
+```
+
+## Counter Signature
+
+Encode/decode cose-sign with counter signature.
+
+### Encode [#ecounter]
+
+```js
+var {
+  CoseKey,
+  CoseMessage,
+  CoseHeader,
+  CoseAgent,
+  Alg,
+  Kty,
+  Crv,
+} = require('cose-w');
+
+let msg = Buffer.from('This is the content.', 'utf8');
+
+// Decode cose-key
+let key = new CoseKey();
+key.bytes = Buffer.from("A601020258246D65726961646F632E6272616E64796275636B406275636B6C616E642E6578616D706C65200121582065EDA5A12577C2BAE829437FE338701A10AAA375E1BB5B5DE108DE439C08551D2258201E52ED75701163F7F9E40DDF9F341B3DC9BA860AF7E0CA7CA7E9EECD0084D19C235820AFF907C99F9AD3AAE6C4CDF21122BCE2BD68B5283E6907154AD911840FA208CF", "hex");
+key.decode();
+
+// Prepare CoseSign
+let sign = CoseMessage.new_sign();
+sign.payload = msg;
+
+let header = new CoseHeader();
+header.set_alg(Alg.es256, true, false);
+header.set_kid(key.kid, true, false);
+sign.header = header;
+
+sign.key(key);
+
+// Generate signature
+sign.secure_content(null);
+
+key.bytes = Buffer.from("A60102024231312001215820BAC5B11CAD8F99F9C72B05CF4B9E26D244DC189F745228255A219A86D6A09EFF22582020138BF82DC1B6D562BE0FA54AB7804A3A64B6D72CCFED6B6FB6ED28BBFC117E23582057C92077664146E876760C9520D054AA93C3AFB04E306705DB6090308507B4D3", "hex");
+key.decode();
+
+// Prepare counter signer
+let counter = CoseAgent.new_counter_sig();
+header = new CoseHeader();
+header.set_kid(key.kid, true, false);
+header.set_alg(Alg.es256, true, false);
+counter.header = header;
+
+counter.key(key);
+
+// Add counter signature to cose-sign1
+sign.counter_sig(null, counter);
+sign.add_counter_sig(counter);
+
+// Encode the cose-sign1 message
+let bytes = sign.encode(true);
+```
+### Decode [#dcounter]
+
+```js
+var {
+  CoseKey,
+  CoseMessage,
+  Alg,
+  Kty,
+  Crv,
+} = require('cose-w');
+let key = new CoseKey();
+key.bytes = Buffer.from("A601020258246D65726961646F632E6272616E64796275636B406275636B6C616E642E6578616D706C65200121582065EDA5A12577C2BAE829437FE338701A10AAA375E1BB5B5DE108DE439C08551D2258201E52ED75701163F7F9E40DDF9F341B3DC9BA860AF7E0CA7CA7E9EECD0084D19C235820AFF907C99F9AD3AAE6C4CDF21122BCE2BD68B5283E6907154AD911840FA208CF", "hex");
+key.decode();
+
+// Prepare CoseSign with the cose-sign1 bytes
+let verify = CoseMessage.new_sign();
+verify.bytes = Buffer.from("d284582aa201260458246d65726961646f632e6272616e64796275636b406275636b6c616e642e6578616d706c65a1078347a2044231310126a0584043e4f6cb352d4fc0942b129e76cdf89690fe2a7a2a5d015abac74968c72b22064126ea3addec92c6ba5257be4295e631f34478f1d7a80be3ac832bd714a39cee54546869732069732074686520636f6e74656e742e58408c6d7a58caa8e23ad509ba291cb17689d61e4ad96a51b4a76d46785655df118cc4137815606d983e0bc55ab45f332aebfef85d4c50965269fc90de5651235ba1", "hex");
+
+// Init decoding
+verify.init_decoder(null);
+
+verify.key(key);
+
+// Verify signature
+let payload = verify.decode(null, null);
+
+key.bytes = Buffer.from("A60102024231312001215820BAC5B11CAD8F99F9C72B05CF4B9E26D244DC189F745228255A219A86D6A09EFF22582020138BF82DC1B6D562BE0FA54AB7804A3A64B6D72CCFED6B6FB6ED28BBFC117E23582057C92077664146E876760C9520D054AA93C3AFB04E306705DB6090308507B4D3", "hex");
+key.decode();
+
+// Get counter signer and verify counter signature
+let i = verify.counter(key.kid, null)[0];
+verify.set_counter_key(i, null, key);
+verify.counters_verify(null, i, null);
+```
+
+## Counter Signature (Externally signed/verified)
+
+Encode/decode cose-mac with counter signature externally signed/verified.
+
+### Encode (externally signed) [#ecounter_e]
+
+```js
+let msg = Buffer.from('This is the content.', 'utf8');
+
+// Decode cose-key
+let key = new CoseKey();
+key.bytes = Buffer.from("A601020258246D65726961646F632E6272616E64796275636B406275636B6C616E642E6578616D706C65200121582065EDA5A12577C2BAE829437FE338701A10AAA375E1BB5B5DE108DE439C08551D2258201E52ED75701163F7F9E40DDF9F341B3DC9BA860AF7E0CA7CA7E9EECD0084D19C235820AFF907C99F9AD3AAE6C4CDF21122BCE2BD68B5283E6907154AD911840FA208CF", "hex");
+key.decode();
+
+// Prepare CoseSign
+let sign = CoseMessage.new_sign();
+sign.payload = msg;
+
+let header = new CoseHeader();
+header.set_alg(Alg.es256, true, false);
+header.set_kid(key.kid, true, false);
+sign.header = header;
+
+sign.key(key);
+
+// Generate signature
+sign.secure_content(null);
+
+// Prepare counter signer
+let counter = CoseAgent.new_counter_sig();
+header = new CoseHeader();
+header.set_kid(key.kid, true, false);
+header.set_alg(Alg.es256, true, false);
+counter.header = header;
+
+// Get the COSE struct to sign externally
+let to_sign = sign.get_to_sign(null, counter, null);
+
+// Sign externally
+let signature = sign_externally_function();
+
+// Add the signature to the counter signer
+counter.add_signature(payload);
+
+// Add the counter signer to the cose_sign message
+sign.add_counter_sig(counter);
+
+// Encode the cose-sign1 message
+let bytes = sign.encode(true);
+```
+
+### Decode (externally verified) [#dcounter_e]
+
+```js
+let key = new CoseKey();
+key.bytes = Buffer.from("A601020258246D65726961646F632E6272616E64796275636B406275636B6C616E642E6578616D706C65200121582065EDA5A12577C2BAE829437FE338701A10AAA375E1BB5B5DE108DE439C08551D2258201E52ED75701163F7F9E40DDF9F341B3DC9BA860AF7E0CA7CA7E9EECD0084D19C235820AFF907C99F9AD3AAE6C4CDF21122BCE2BD68B5283E6907154AD911840FA208CF", "hex");
+key.decode();
+
+// Prepare CoseSign with the cose-sign1 bytes
+let verify = CoseMessage.new_sign();
+verify.bytes = Buffer.from("d284582aa201260458246d65726961646f632e6272616e64796275636b406275636b6c616e642e6578616d706c65a1078347a2044231310126a0584043e4f6cb352d4fc0942b129e76cdf89690fe2a7a2a5d015abac74968c72b22064126ea3addec92c6ba5257be4295e631f34478f1d7a80be3ac832bd714a39cee54546869732069732074686520636f6e74656e742e58408c6d7a58caa8e23ad509ba291cb17689d61e4ad96a51b4a76d46785655df118cc4137815606d983e0bc55ab45f332aebfef85d4c50965269fc90de5651235ba1", "hex");
+
+// Init decoding
+verify.init_decoder(null);
+
+verify.key(key);
+
+// Verify signature
+let payload = verify.decode(null, null);
+
+// Get counter signer and verify counter signature
+let i = verify.counter(key.kid, null)[0];
+
+// Get the COSE struct to verify with the signature
+let to_verify = verify.get_to_verify(null, i, null);
+
+let signature = verify.header.counters[i].payload;
+
+// Verify the function externally
+verify_externally_function();
 ```

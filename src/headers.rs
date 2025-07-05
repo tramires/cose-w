@@ -261,27 +261,27 @@ impl CoseHeader {
     pub fn static_kid(&self) -> Option<Vec<u8>> {
         self.static_kid.clone()
     }
-    pub fn set_static_kid(&mut self, kid: Vec<u8>, key: keys::CoseKey, prot: bool, crit: bool) {
+    pub fn set_static_kid(&mut self, kid: Vec<u8>, key: &keys::CoseKey, prot: bool, crit: bool) {
         self.remove_label(STATIC_KEY);
         self.remove_label(EPHEMERAL_KEY);
         self.reg_label(STATIC_KEY_ID, prot, crit);
-        self.ecdh_key = key;
+        self.ecdh_key = key.clone();
         self.static_kid = Some(kid);
     }
-    pub fn ephemeral_key(&mut self, key: keys::CoseKey, prot: bool, crit: bool) {
+    pub fn ephemeral_key(&mut self, key: &keys::CoseKey, prot: bool, crit: bool) {
         self.remove_label(STATIC_KEY_ID);
         self.remove_label(STATIC_KEY);
         self.static_kid = None;
         self.reg_label(EPHEMERAL_KEY, prot, crit);
-        self.ecdh_key = key;
+        self.ecdh_key = key.clone();
     }
 
-    pub fn static_key(&mut self, key: keys::CoseKey, prot: bool, crit: bool) {
+    pub fn static_key(&mut self, key: &keys::CoseKey, prot: bool, crit: bool) {
         self.remove_label(STATIC_KEY_ID);
         self.remove_label(EPHEMERAL_KEY);
         self.static_kid = None;
         self.reg_label(STATIC_KEY, prot, crit);
-        self.ecdh_key = key;
+        self.ecdh_key = key.clone();
     }
 
     #[wasm_bindgen(getter)]
@@ -418,9 +418,9 @@ impl CoseHeader {
                 ecdh_key.remove_label(keys::D);
                 ecdh_key.d = None;
                 if label == EPHEMERAL_KEY {
-                    ecdh_key.remove_label(keys::KID)
+                    ecdh_key.remove_label(keys::KID);
+                    ecdh_key.kid = None;
                 }
-                ecdh_key.kid = None;
                 ecdh_key.encode_key(encoder)?;
             }
             STATIC_KEY_ID => {
@@ -718,15 +718,15 @@ mod test_vecs {
         let key = keys::CoseKey::new();
         let mut header = CoseHeader::new();
 
-        header.set_static_kid(vec![], key.clone(), false, true);
+        header.set_static_kid(vec![], &key, false, true);
         assert_eq!(vec![STATIC_KEY_ID], header.unprotected);
         assert_eq!(vec![STATIC_KEY_ID], header.crit);
 
-        header.ephemeral_key(key.clone(), false, true);
+        header.ephemeral_key(&key, false, true);
         assert_eq!(vec![EPHEMERAL_KEY], header.unprotected);
         assert_eq!(vec![EPHEMERAL_KEY], header.crit);
 
-        header.static_key(key, false, true);
+        header.static_key(&key, false, true);
         assert_eq!(vec![STATIC_KEY], header.unprotected);
         assert_eq!(vec![STATIC_KEY], header.crit);
     }

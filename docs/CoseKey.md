@@ -35,3 +35,37 @@
 | ---- | ---------- | ------- | ----------- |
 | `encode()` | --- | --- | Encodes the COSE Key. | 
 | `decode()` | --- | --- | Decodes the COSE Key. | 
+
+## Key Encode/Decode Example
+
+```js
+var {
+  CoseKey,
+  Alg,
+  Kty,
+  Crv,
+} = require('cose-w');
+
+var assert = require('assert');
+
+
+// Encode Key
+let key = new CoseKey();
+key.alg = Alg.es256;
+key.kid = Buffer.from("key1", "utf8");
+key.kty = Kty.ec2;
+key.crv = Crv.p_256;
+
+key.encode();
+
+// Decode Key
+let decode_key = new CoseKey();
+decode_key.bytes = key.bytes;
+decode_key.decode();
+
+assert.deepEqual(decode_key.alg, Alg.es256);
+assert.deepEqual(decode_key.kid, Buffer.from("key1", "utf8"));
+assert.deepEqual(decode_key.kty, Kty.ec2);
+assert.deepEqual(decode_key.crv, Crv.p_256);
+
+```

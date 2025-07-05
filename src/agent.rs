@@ -74,35 +74,14 @@ impl CoseAgent {
     pub fn payload(&self) -> Vec<u8> {
         self.payload.clone()
     }
-    pub fn ephemeral_key(&mut self, key: keys::CoseKey, prot: bool, crit: bool) {
+    pub fn ephemeral_key(&mut self, key: &keys::CoseKey, prot: bool, crit: bool) {
         self.header.ephemeral_key(key, prot, crit);
     }
-    pub fn static_key(&mut self, key: keys::CoseKey, prot: bool, crit: bool) {
+    pub fn static_key(&mut self, key: &keys::CoseKey, prot: bool, crit: bool) {
         self.header.static_key(key, prot, crit);
     }
-    pub fn static_kid(&mut self, kid: Vec<u8>, key: keys::CoseKey, prot: bool, crit: bool) {
+    pub fn static_kid(&mut self, kid: Vec<u8>, key: &keys::CoseKey, prot: bool, crit: bool) {
         self.header.set_static_kid(kid, key, prot, crit);
-    }
-    pub(crate) fn enc(
-        &mut self,
-        content: &Vec<u8>,
-        external_aad: &Vec<u8>,
-        body_protected: &Vec<u8>,
-        alg: &i32,
-        iv: &Vec<u8>,
-    ) -> Result<Vec<u8>, JsValue> {
-        if !self.key_ops.is_empty() && !self.key_ops.contains(&keys::KEY_OPS_ENCRYPT) {
-            return Err(JsValue::from("Missing Key key_ops_encrypt"));
-        }
-        Ok(cose_struct::gen_cipher(
-            &self.s_key,
-            alg,
-            iv,
-            &external_aad,
-            &self.context,
-            &body_protected,
-            &content,
-        )?)
     }
     pub(crate) fn sign(
         &mut self,
