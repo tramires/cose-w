@@ -71,11 +71,12 @@ Methods for COSE messages with counter signatures:
 
 # Examples 
 
-- cose-sign (Multiple signers COSE Sign message): [Encode](#ecose-sign) and [Decode](#dcose-sign)
-- cose-encrypt (Multiple recipients COSE Encrypt message w/ Direct Key): [Encode](#ecose-encrypt) and [Decode](#dcose-encrypt)
-- cose-mac (Multiple recipients COSE MAC message w/ ECDH): [Encode](#ecose-mac) and [Decode](#dcose-mac)
-- Counter Signature: [Encode](#ecounter) and [Decode](#dcounter) 
-- Counter Signature (Externally signed/verified): [Encode](#ecounter_e) and [Decode](#dcounter_e) 
+- cose-sign (Multiple signers COSE Sign message): [Encode](#encode-cose-sign) and
+  [Decode](#decode-cose-sign)
+- cose-encrypt (Multiple recipients COSE Encrypt message w/ Direct Key): [Encode](#encode-cose-encrypt) and [Decode](#decode-cose-encrypt)
+- cose-mac (Multiple recipients COSE MAC message w/ ECDH): [Encode](#encode-cose-mac) and [Decode](#decode-cose-mac)
+- Counter Signature: [Encode](#encode-counter-signature) and [Decode](#decode-counter-signature) 
+- Counter Signature (Externally signed/verified): [Encode](#encode-externally-signed) and [Decode](#decode-externally-verified) 
 
 Examples of single recipient messages (cose-sign1, cose-mac0 and cose-encrypt0) can be seen
 [here](README.md).
@@ -84,7 +85,7 @@ Examples of single recipient messages (cose-sign1, cose-mac0 and cose-encrypt0) 
 
 Encode/decode cose-sign.
 
-### Encode cose-sign {#ecose-sign}
+### Encode cose-sign 
 ```js
 var {
   CoseKey,
@@ -140,7 +141,7 @@ sign.secure_content(null);
 let bytes = sign.encode(true);
 ```
 
-### Decode cose-sign {#dcose-sign}
+### Decode cose-sign
 ```js
 var {
   CoseKey,
@@ -182,7 +183,7 @@ payload = verify.decode(null, signer2_index);
 
 Encode/decode cose-encrypt with Direct Key.
 
-### Encode cose-encrypt {#ecose-encrypt}
+### Encode cose-encrypt
 ```js
 let msg = Buffer.from('This is the content.', 'utf8');
 
@@ -217,7 +218,7 @@ enc.add_agent(recipient);
 enc.secure_content(null);
 let bytes = enc.encode(true);
 ```
-### Decode cose-encrypt {#dcose-encrypt}
+### Decode cose-encrypt
 ```js
 var {
   CoseKey,
@@ -258,7 +259,7 @@ assert.deepEqual(Buffer.from(msg).toString(), expected_msg.toString());
 
 Encode/decode cose-mac.
 
-### Encode cose-mac {#ecose-mac}
+### Encode cose-mac
 
 ```js
 var {
@@ -336,7 +337,7 @@ mac.secure_content(null);
 let bytes = mac.encode(true);
 ```
 
-### Decode cose-mac {#dcose-mac}
+### Decode cose-mac
 ```js
 var {
   CoseKey,
@@ -398,7 +399,7 @@ for (let i = 0; i < verify.agents.length; i++) {
 
 Encode/decode cose-sign with counter signature.
 
-### Encode {#ecounter}
+### Encode Counter Signature
 
 ```js
 var {
@@ -451,7 +452,7 @@ sign.add_counter_sig(counter);
 // Encode the cose-sign1 message
 let bytes = sign.encode(true);
 ```
-### Decode {#dcounter}
+### Decode Counter Signature
 
 ```js
 var {
@@ -490,7 +491,7 @@ verify.counters_verify(null, i, null);
 
 Encode/decode cose-mac with counter signature externally signed/verified.
 
-### Encode (externally signed) {#ecounter_e}
+### Encode (externally signed)
 
 ```js
 let msg = Buffer.from('This is the content.', 'utf8');
@@ -537,7 +538,7 @@ sign.add_counter_sig(counter);
 let bytes = sign.encode(true);
 ```
 
-### Decode (externally verified) {#dcounter_e}
+### Decode (externally verified)
 
 ```js
 let key = new CoseKey();
