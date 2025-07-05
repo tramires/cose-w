@@ -84,7 +84,7 @@ Examples of single recipient messages (cose-sign1, cose-mac0 and cose-encrypt0) 
 
 Encode/decode cose-sign.
 
-### Encode cose-sign [#ecose-sign]
+### Encode cose-sign {#ecose-sign}
 ```js
 var {
   CoseKey,
@@ -140,7 +140,7 @@ sign.secure_content(null);
 let bytes = sign.encode(true);
 ```
 
-### Decode cose-sign [#dcose-sign]
+### Decode cose-sign {#dcose-sign}
 ```js
 var {
   CoseKey,
@@ -182,7 +182,7 @@ payload = verify.decode(null, signer2_index);
 
 Encode/decode cose-encrypt with Direct Key.
 
-### Encode cose-encrypt [#ecose-encrypt]
+### Encode cose-encrypt {#ecose-encrypt}
 ```js
 let msg = Buffer.from('This is the content.', 'utf8');
 
@@ -217,7 +217,7 @@ enc.add_agent(recipient);
 enc.secure_content(null);
 let bytes = enc.encode(true);
 ```
-### Decode cose-encrypt [#dcose-encrypt]
+### Decode cose-encrypt {#dcose-encrypt}
 ```js
 var {
   CoseKey,
@@ -258,7 +258,7 @@ assert.deepEqual(Buffer.from(msg).toString(), expected_msg.toString());
 
 Encode/decode cose-mac.
 
-### Encode cose-mac [#ecose-mac]
+### Encode cose-mac {#ecose-mac}
 
 ```js
 var {
@@ -336,7 +336,7 @@ mac.secure_content(null);
 let bytes = mac.encode(true);
 ```
 
-### Decode cose-mac [#dcose-mac]
+### Decode cose-mac {#dcose-mac}
 ```js
 var {
   CoseKey,
@@ -398,7 +398,7 @@ for (let i = 0; i < verify.agents.length; i++) {
 
 Encode/decode cose-sign with counter signature.
 
-### Encode [#ecounter]
+### Encode {#ecounter}
 
 ```js
 var {
@@ -451,7 +451,7 @@ sign.add_counter_sig(counter);
 // Encode the cose-sign1 message
 let bytes = sign.encode(true);
 ```
-### Decode [#dcounter]
+### Decode {#dcounter}
 
 ```js
 var {
@@ -490,7 +490,7 @@ verify.counters_verify(null, i, null);
 
 Encode/decode cose-mac with counter signature externally signed/verified.
 
-### Encode (externally signed) [#ecounter_e]
+### Encode (externally signed) {#ecounter_e}
 
 ```js
 let msg = Buffer.from('This is the content.', 'utf8');
@@ -537,7 +537,7 @@ sign.add_counter_sig(counter);
 let bytes = sign.encode(true);
 ```
 
-### Decode (externally verified) [#dcounter_e]
+### Decode (externally verified) {#dcounter_e}
 
 ```js
 let key = new CoseKey();
