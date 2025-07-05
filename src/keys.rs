@@ -1081,6 +1081,24 @@ mod test_vecs {
     }
 
     #[wasm_bindgen_test]
+    fn key_ops_symm() {
+        let mut key = CoseKey::new();
+        key.set_kty(Some(SYMMETRIC));
+        key.set_key_ops(vec![KEY_OPS_ENCRYPT]);
+        assert!(key.verify_key_ops().is_err());
+        key.set_x(Some(vec![]));
+        assert!(key.verify_key_ops().is_err());
+        key.set_y(Some(vec![]));
+        assert!(key.verify_key_ops().is_err());
+        key.set_k(Some(vec![]));
+        assert!(key.verify_key_ops().is_err());
+        key.set_x(None);
+        assert!(key.verify_key_ops().is_err());
+        key.set_y(None);
+        key.verify_key_ops().unwrap();
+    }
+
+    #[wasm_bindgen_test]
     fn key_ops_ec2_okp() {
         let mut key = CoseKey::new();
         key.set_kty(Some(EC2));

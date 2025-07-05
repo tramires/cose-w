@@ -196,3 +196,157 @@ impl Decoder {
         }
     }
 }
+
+#[cfg(test)]
+mod cbor_test_vecs {
+    use crate::cbor;
+    use serde_json::Value;
+    use wasm_bindgen_test::*;
+
+    fn i32(v: i64, e: &mut cbor::Encoder, d: &mut cbor::Decoder) {
+        assert_eq!(d.signed().unwrap(), i32::try_from(v).unwrap());
+        e.signed(i32::try_from(v).unwrap());
+    }
+
+    fn bool(v: &bool, e: &mut cbor::Encoder, d: &mut cbor::Decoder) {
+        assert_eq!(d.bool().unwrap(), *v);
+        e.bool(*v);
+    }
+
+    fn text(v: &str, e: &mut cbor::Encoder, d: &mut cbor::Decoder) {
+        assert_eq!(d.text().unwrap(), v);
+        e.text(v);
+    }
+
+    fn object(o: &serde_json::Map<String, Value>, e: &mut cbor::Encoder, d: &mut cbor::Decoder) {
+        let len = o.len();
+        assert_eq!(d.object().unwrap(), len);
+        e.object(len);
+        for (k, v) in o {
+            text(k, e, d);
+            match v {
+                Value::Number(n) => {
+                    i32(n.as_i64().unwrap(), e, d);
+                }
+                Value::String(s) => {
+                    text(s.as_str(), e, d);
+                }
+                Value::Array(a) => {
+                    array(a, e, d);
+                }
+                _ => {
+                    panic!("Not covered")
+                }
+            }
+        }
+    }
+    fn array(a: &Vec<Value>, e: &mut cbor::Encoder, d: &mut cbor::Decoder) {
+        let len = a.len();
+        assert_eq!(d.array().unwrap(), len);
+        e.array(len);
+        for v in a {
+            match v {
+                Value::Number(n) => {
+                    i32(n.as_i64().unwrap(), e, d);
+                }
+                Value::String(s) => {
+                    text(s.as_str(), e, d);
+                }
+                Value::Array(a1) => {
+                    array(a1, e, d);
+                }
+                Value::Object(o) => {
+                    object(&o, e, d);
+                }
+                Value::Bool(b) => {
+                    bool(b, e, d);
+                }
+                _ => {
+                    panic!("Not covered")
+                }
+            }
+        }
+    }
+
+    fn bytes(b: &str, e: &mut cbor::Encoder, d: &mut cbor::Decoder) {
+        let bytes = hex::decode(&b[2..&b.len() - 1]).unwrap();
+        assert_eq!(d.bytes().unwrap(), bytes);
+        e.bytes(&bytes);
+    }
+
+    fn decode_json(v: &Value, e: &mut cbor::Encoder, d: &mut cbor::Decoder) {
+        match v {
+            Value::Number(n) => {
+                i32(n.as_i64().unwrap(), e, d);
+            }
+            Value::Bool(b) => {
+                bool(b, e, d);
+            }
+            Value::String(s) => {
+                text(s.as_str(), e, d);
+            }
+            Value::Object(o) => {
+                object(o, e, d);
+            }
+            Value::Array(a) => {
+                array(a, e, d);
+            }
+            _ => {
+                panic!("Not covered")
+            }
+        }
+    }
+
+    fn decode_diagnostic(v: &Value, e: &mut cbor::Encoder, d: &mut cbor::Decoder) {
+        use regex::Regex;
+        let re = Regex::new(r"^(\d+)\((.*)\)$").unwrap();
+        match &v {
+            Value::String(s) => match re.captures(s) {
+                Some(caps) => {
+                    let tag = &caps[1].parse::<u32>().unwrap();
+                    assert_eq!(d.tag().unwrap(), *tag);
+                    e.tag(*tag);
+                    if &caps[2][..2] == "h'" {
+                        bytes(&caps[2], e, d);
+                    } else {
+                        let value: Value = serde_json::from_str(&caps[2]).unwrap();
+                        decode_json(&value, e, d);
+                    }
+                }
+                None => {
+                    bytes(s.as_str(), e, d);
+                }
+            },
+            _ => {
+                panic!("Not covered")
+            }
+        }
+    }
+
+    #[wasm_bindgen_test]
+    fn cbor_test_vecs() {
+        let vec: Vec<Value> =
+            serde_json::from_str(&include_str!("../test_params/cbor.json")).unwrap();
+        let mut counter = 0;
+
+        for v in &vec {
+            let mut d = cbor::Decoder::new(hex::decode(v["hex"].as_str().unwrap()).unwrap());
+            let mut e = cbor::Encoder::new();
+
+            if v.as_object().unwrap().contains_key("diagnostic") {
+                counter += 1;
+                decode_diagnostic(&v["diagnostic"], &mut e, &mut d);
+            }
+
+            if v.as_object().unwrap().contains_key("decoded") {
+                counter += 1;
+                decode_json(&v["decoded"], &mut e, &mut d);
+            }
+            assert_eq!(
+                e.encoded(),
+                hex::decode(v["hex"].as_str().unwrap()).unwrap()
+            );
+        }
+        assert_eq!(counter, vec.len());
+    }
+}
