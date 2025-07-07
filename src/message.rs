@@ -230,7 +230,7 @@ impl CoseMessage {
             if !agent.key_ops.is_empty() && !agent.key_ops.contains(&keys::KEY_OPS_SIGN) {
                 return Err(JsValue::from("Key doesn't support sign"));
             }
-        } else if self.context == ENC
+        } else if (self.context == MAC || self.context == ENC)
             && !algs::KEY_DISTRIBUTION_ALGS.contains(
                 &agent
                     .header
@@ -1027,6 +1027,9 @@ impl CoseMessage {
                         .alg
                         .ok_or(JsValue::from("Missing algorithm"))?
                 {
+                    if self.agents.len() > 1 {
+                        return Err(JsValue::from("Only one recipient allowed for algorithm"));
+                    }
                     if !self.agents[index].key_ops.is_empty()
                         && !self.agents[index].key_ops.contains(&KO[self.context][1])
                     {

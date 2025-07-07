@@ -405,10 +405,7 @@ impl CoseKey {
         if !self.key_ops.is_empty() {
             match kty {
                 EC2 | OKP => {
-                    if self.key_ops.contains(&KEY_OPS_VERIFY)
-                        || self.key_ops.contains(&KEY_OPS_DERIVE)
-                        || self.key_ops.contains(&KEY_OPS_DERIVE_BITS)
-                    {
+                    if self.key_ops.contains(&KEY_OPS_VERIFY) {
                         if self.x == None {
                             return Err(JsValue::from("Missing X parameter"));
                         } else if kty == EC2 && self.y.is_none() && self.y_parity.is_none() {
@@ -417,7 +414,10 @@ impl CoseKey {
                             return Err(JsValue::from("Missing Curve"));
                         }
                     }
-                    if self.key_ops.contains(&KEY_OPS_SIGN) {
+                    if self.key_ops.contains(&KEY_OPS_SIGN)
+                        || self.key_ops.contains(&KEY_OPS_DERIVE)
+                        || self.key_ops.contains(&KEY_OPS_DERIVE_BITS)
+                    {
                         if self.d == None {
                             return Err(JsValue::from("Missing D parameter"));
                         } else if self.crv == None {
@@ -446,10 +446,7 @@ impl CoseKey {
                     }
                 }
                 RSA => {
-                    if self.key_ops.contains(&KEY_OPS_VERIFY)
-                        || self.key_ops.contains(&KEY_OPS_DERIVE)
-                        || self.key_ops.contains(&KEY_OPS_DERIVE_BITS)
-                    {
+                    if self.key_ops.contains(&KEY_OPS_VERIFY) {
                         if self.n.is_none() {
                             return Err(JsValue::from("Missing N parmater"));
                         } else if self.e.is_none() {
@@ -469,7 +466,10 @@ impl CoseKey {
                             return Err(JsValue::from("Invalid params for RSA public key"));
                         }
                     }
-                    if self.key_ops.contains(&KEY_OPS_SIGN) {
+                    if self.key_ops.contains(&KEY_OPS_SIGN)
+                        || self.key_ops.contains(&KEY_OPS_DERIVE)
+                        || self.key_ops.contains(&KEY_OPS_DERIVE_BITS)
+                    {
                         if [
                             &self.n,
                             &self.e,
