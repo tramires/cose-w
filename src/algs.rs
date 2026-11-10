@@ -1443,9 +1443,6 @@ mod vector_tests {
             let mut signature = algs::sign(alg, crv, &s_key, &msg).unwrap();
 
             assert!(algs::verify(alg, crv, &p_key, &msg, &signature).unwrap());
-            if !algs::verify(alg, crv, &p_key, &msg, &sig).unwrap() {
-                assert_eq!(signature, sig);
-            }
             assert!(algs::verify(alg, crv, &p_key, &msg, &sig).unwrap());
 
             // flip signature byte

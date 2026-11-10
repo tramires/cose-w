@@ -865,7 +865,11 @@ impl CoseKey {
                         self.qinv.as_ref().ok_or(JsValue::from("Missing QI"))?,
                     )
                     .map_err(|_| JsValue::from("Invalid QI"))?,
-                    other_prime_infos: None,
+                    other_prime_infos: if other_primes.len() > 0 {
+                        Some(other_primes)
+                    } else {
+                        None
+                    },
                 };
 
                 match key.to_der() {
