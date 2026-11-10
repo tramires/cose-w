@@ -371,6 +371,12 @@ mod test_vecs {
     use crate::message::CoseMessage;
     use wasm_bindgen_test::*;
 
+    fn remove_probabilistic(output: &mut Vec<u8>, expected: &mut Vec<u8>, rem: Vec<u8>) {
+        let i = expected.windows(rem.len()).position(|w| w == rem).unwrap();
+        expected.drain(i..i + rem.len());
+        output.drain(i..i + rem.len());
+    }
+
     pub fn get_test_vec(id: &str) -> Vec<u8> {
         let test_vecs = include_str!("../test_params/test_vecs.csv");
         let mut msg = vec![];
@@ -431,7 +437,7 @@ mod test_vecs {
         header.set_kid(kid.clone(), false, false);
         header.set_alg(algs::ES256, true, false);
 
-        let key = get_key(kid.clone(), false);
+        let mut key = get_key(kid.clone(), false);
 
         let mut agent = agent::CoseAgent::new();
         agent.set_header(header);
@@ -443,7 +449,7 @@ mod test_vecs {
         let mut counter = agent::CoseAgent::new_counter_sig();
 
         let mut header = headers::CoseHeader::new();
-        header.set_kid(kid, false, false);
+        header.set_kid(kid.clone(), false, false);
         header.set_alg(algs::ES256, true, false);
 
         counter.set_header(header);
@@ -462,7 +468,28 @@ mod test_vecs {
 
         sign.add_counter_sig(counter, None).unwrap();
 
-        let bytes = sign.encode(true).unwrap();
-        assert_eq!(bytes, get_test_vec("C13"));
+        let mut output = sign.encode(true).unwrap();
+        let mut expected = get_test_vec("C13");
+
+        // Remove probabilistic
+        remove_probabilistic(&mut output, &mut expected, hex::decode("5ac05e289d5d0e1b0a7f048a5d2b643813ded50bc9e49220f4f7278f85f19d4a77d655c9d3b51e805a74b099e1e085aacd97fc29d72f887e8802bb6650cceb2c").unwrap());
+        remove_probabilistic(&mut output, &mut expected, hex::decode("e2aeafd40d69d19dfe6e52077c5d7ff4e408282cbefb5d06cbf414af2e19d982ac45ac98b8544c908b4507de1e90b717c3d34816fe926a2b98f53afd2fa0f30a").unwrap());
+
+        assert_eq!(output, expected);
+
+        // Verify
+        let mut verify = CoseMessage::new_sign();
+        verify.set_bytes(sign.bytes);
+
+        verify.init_decoder(None).unwrap();
+        let i = verify.get_agent(kid.clone()).unwrap()[0];
+        key = get_key(kid, true);
+        verify.set_agent_key(i, &key).unwrap();
+
+        verify.decode(None, Some(i)).unwrap();
+
+        let counter = verify.counter(b"11".to_vec(), None).unwrap()[0];
+        verify.set_counter_key(counter, None, &key).unwrap();
+        verify.counters_verify(None, counter, None).unwrap();
     }
 }

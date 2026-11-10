@@ -72,6 +72,26 @@ impl Alg {
         algs::AES_CCM_64_64_128
     }
     #[wasm_bindgen(getter)]
+    pub fn aes_ccm_64_64_256() -> i32 {
+        algs::AES_CCM_64_64_256
+    }
+    #[wasm_bindgen(getter)]
+    pub fn aes_ccm_16_128_128() -> i32 {
+        algs::AES_CCM_16_128_128
+    }
+    #[wasm_bindgen(getter)]
+    pub fn aes_ccm_16_128_256() -> i32 {
+        algs::AES_CCM_16_128_256
+    }
+    #[wasm_bindgen(getter)]
+    pub fn aes_ccm_64_128_128() -> i32 {
+        algs::AES_CCM_64_128_128
+    }
+    #[wasm_bindgen(getter)]
+    pub fn aes_ccm_64_128_256() -> i32 {
+        algs::AES_CCM_64_128_256
+    }
+    #[wasm_bindgen(getter)]
     pub fn hmac_256_64() -> i32 {
         algs::HMAC_256_64
     }
@@ -174,6 +194,18 @@ impl Alg {
     #[wasm_bindgen(getter)]
     pub fn ecdh_ss_a256kw() -> i32 {
         algs::ECDH_SS_A256KW
+    }
+    #[wasm_bindgen(getter)]
+    pub fn rsa_oaep_1() -> i32 {
+        algs::RSA_OAEP_1
+    }
+    #[wasm_bindgen(getter)]
+    pub fn rsa_oaep_256() -> i32 {
+        algs::RSA_OAEP_256
+    }
+    #[wasm_bindgen(getter)]
+    pub fn rsa_oaep_512() -> i32 {
+        algs::RSA_OAEP_512
     }
 }
 

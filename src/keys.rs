@@ -1,8 +1,6 @@
 use crate::cbor::{Decoder, Encoder, CBOR_FALSE, CBOR_TRUE};
 use crate::headers;
 use js_sys::{Array, Uint8Array};
-use rsa::pkcs8::EncodePublicKey;
-use rsa::{BigUint, RsaPrivateKey, RsaPublicKey};
 use wasm_bindgen::prelude::*;
 
 pub(crate) const ECDH_KTY: [i32; 2] = [OKP, EC2];
@@ -826,36 +824,56 @@ impl CoseKey {
                 Ok(d)
             }
             RSA => {
-                use rsa::pkcs1::EncodeRsaPrivateKey;
-                let mut primes = vec![
-                    BigUint::from_bytes_be(self.p.as_ref().ok_or(JsValue::from("Missing P"))?),
-                    BigUint::from_bytes_be(self.q.as_ref().ok_or(JsValue::from("Missing Q"))?),
-                ];
+                use pkcs1::der::Encode;
+                use pkcs1::{OtherPrimeInfo, RsaPrivateKey, UintRef};
+
+                let mut other_primes = vec![];
 
                 if self.other.is_some() {
                     for prime in self.other.as_ref().unwrap() {
-                        primes.push(BigUint::from_bytes_be(&prime[0]));
+                        other_primes.push(OtherPrimeInfo {
+                            prime: UintRef::new(&prime[0])
+                                .map_err(|_| JsValue::from("Invalid r_i"))?,
+                            exponent: UintRef::new(&prime[1])
+                                .map_err(|_| JsValue::from("Invalid d_i"))?,
+                            coefficient: UintRef::new(&prime[2])
+                                .map_err(|_| JsValue::from("Invalid t_i"))?,
+                        });
                     }
                 };
 
-                match RsaPrivateKey::from_components(
-                    BigUint::from_bytes_be(self.n.as_ref().ok_or(JsValue::from("Missing N"))?),
-                    BigUint::from_bytes_be(self.e.as_ref().ok_or(JsValue::from("Missing E"))?),
-                    BigUint::from_bytes_be(self.rsa_d.as_ref().ok_or(JsValue::from("Missing D"))?),
-                    primes,
-                ) {
-                    Ok(v) => match v.to_pkcs1_der() {
-                        Ok(v2) => {
-                            return Ok(v2.to_bytes().to_vec());
-                        }
-                        Err(_) => {
-                            return Err(JsValue::from("RSA Public Key error"));
-                        }
-                    },
-                    Err(_) => {
-                        return Err(JsValue::from("RSA Public Key error"));
-                    }
+                let key = RsaPrivateKey {
+                    modulus: UintRef::new(self.n.as_ref().ok_or(JsValue::from("Missing N"))?)
+                        .map_err(|_| JsValue::from("Invalid N"))?,
+                    public_exponent: UintRef::new(
+                        self.e.as_ref().ok_or(JsValue::from("Missing E"))?,
+                    )
+                    .map_err(|_| JsValue::from("Invalid E"))?,
+                    private_exponent: UintRef::new(
+                        self.rsa_d.as_ref().ok_or(JsValue::from("Missing D"))?,
+                    )
+                    .map_err(|_| JsValue::from("Invalid D"))?,
+                    prime1: UintRef::new(self.p.as_ref().ok_or(JsValue::from("Missing P"))?)
+                        .map_err(|_| JsValue::from("Invalid P"))?,
+                    prime2: UintRef::new(self.q.as_ref().ok_or(JsValue::from("Missing Q"))?)
+                        .map_err(|_| JsValue::from("Invalid Q"))?,
+                    exponent1: UintRef::new(self.dp.as_ref().ok_or(JsValue::from("Missing DP"))?)
+                        .map_err(|_| JsValue::from("Invalid DP"))?,
+                    exponent2: UintRef::new(self.dq.as_ref().ok_or(JsValue::from("Missing DQ"))?)
+                        .map_err(|_| JsValue::from("Invalid DQ"))?,
+                    coefficient: UintRef::new(
+                        self.qinv.as_ref().ok_or(JsValue::from("Missing QI"))?,
+                    )
+                    .map_err(|_| JsValue::from("Invalid QI"))?,
+                    other_prime_infos: None,
                 };
+
+                match key.to_der() {
+                    Ok(v) => Ok(v),
+                    Err(_) => {
+                        return Err(JsValue::from("RSA Private Key error"));
+                    }
+                }
             }
             SYMMETRIC => {
                 let k = self
@@ -908,22 +926,24 @@ impl CoseKey {
                 Ok(pub_key)
             }
             RSA => {
-                match RsaPublicKey::new(
-                    BigUint::from_bytes_be(self.n.as_ref().ok_or(JsValue::from("Missing N"))?),
-                    BigUint::from_bytes_be(self.e.as_ref().ok_or(JsValue::from("Missing E"))?),
-                ) {
-                    Ok(v) => match v.to_public_key_der() {
-                        Ok(v2) => {
-                            return Ok(v2.to_vec());
-                        }
-                        Err(_) => {
-                            return Err(JsValue::from("RSA Public Key error"));
-                        }
-                    },
+                use pkcs1::der::Encode;
+                use pkcs1::{RsaPublicKey, UintRef};
+
+                let key = RsaPublicKey {
+                    modulus: UintRef::new(self.n.as_ref().ok_or(JsValue::from("Missing N"))?)
+                        .map_err(|_| JsValue::from("Invalid N"))?,
+                    public_exponent: UintRef::new(
+                        self.e.as_ref().ok_or(JsValue::from("Missing E"))?,
+                    )
+                    .map_err(|_| JsValue::from("Invalid E"))?,
+                };
+
+                match key.to_der() {
+                    Ok(v) => Ok(v),
                     Err(_) => {
                         return Err(JsValue::from("RSA Public Key error"));
                     }
-                };
+                }
             }
             _ => Err(JsValue::from("InvalidKTY")),
         }
