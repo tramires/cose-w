@@ -818,20 +818,13 @@ impl CoseMessage {
 
         match d.bytes() {
             Ok(v) => {
-                self.ph_bstr = v;
+                if v.len() == 1 && v[0] == 160 {
+                    self.ph_bstr = Vec::new();
+                } else {
+                    self.ph_bstr = v;
+                }
             }
-            Err(_) => match d.object() {
-                Ok(v1) => {
-                    if v1 == 0 {
-                        self.ph_bstr = Vec::new();
-                    } else {
-                        return Err(JsValue::from("Invalid cose structure"));
-                    }
-                }
-                Err(_) => {
-                    return Err(JsValue::from("Invalid cose structure"));
-                }
-            },
+            Err(_) => return Err(JsValue::from("Invalid cose structure")),
         }
         if !self.ph_bstr.is_empty() {
             self.header.decode_protected_bstr(self.ph_bstr.clone())?;
